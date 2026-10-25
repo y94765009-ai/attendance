@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الحضور والانصراف | كلية تكنولوجيا العلوم الصحية التطبيقية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; }
+        .glass-effect { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1); }
+        .checkbox-custom { accent-color: #1e3a8a; width: 1.25rem; height: 1.25rem; cursor: pointer; }
+    </style>
+</head>
+<body class="min-h-screen relative pb-10">
+    <!-- رأس الصفحة -->
+    <header class="bg-blue-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-white rounded-full p-2 flex items-center justify-center text-blue-900 w-12 h-12 border-2 border-blue-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">جامعة المنصورة الأهلية</h1>
+                    <p class="text-xs text-blue-200">كلية تكنولوجيا العلوم الصحية التطبيقية</p>
+                </div>
+            </div>
+            <button onclick="openAdmin()" class="p-2 hover:bg-blue-800 rounded-full transition-colors" title="لوحة الإدارة">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- نافذة إقرار الموافقة على الموقع -->
+    <div id="consentModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">إقرار الموافقة على استخدام الموقع الجغرافي</h3>
+            <p class="text-sm text-gray-700 leading-7 mb-4">
+                أوافق على قيام الكلية بالاطلاع على موقعي الجغرافي وقت تسجيل الحضور أو الانصراف فقط،
+                وذلك للتحقق من وجودي داخل الحرم الجامعي. يتم حفظ الإحداثيات ومسافة البعد عن الحرم مع
+                بيانات التسجيل، ولا يتم تتبع موقعي في أي وقت آخر، ولا تُستخدم البيانات لغير أغراض
+                الحضور والانصراف.
+            </p>
+            <label class="flex items-center gap-3 mb-4 cursor-pointer">
+                <input type="checkbox" id="consentCheck" class="checkbox-custom">
+                <span class="text-sm font-semibold text-gray-800">قرأت الإقرار وأوافق عليه</span>
+            </label>
+            <div class="flex gap-2">
+                <button onclick="acceptConsent()" class="flex-1 bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg">موافق ومتابعة</button>
+                <button onclick="declineConsent()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 rounded-lg">لا أوافق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- واجهة التسجيل -->
+    <main id="registrationView" class="max-w-md mx-auto mt-8 px-4">
+        <div class="glass-effect rounded-2xl p-6 border border-gray-100">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center border-b pb-4">بوابة تسجيل الحضور والانصراف</h2>
+
+            <div class="flex bg-gray-200 p-1 rounded-xl mb-5">
+                <button type="button" id="tabAttendance" onclick="switchActionType('حضور')" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-blue-900 text-white shadow">تسجيل حضور</button>
+                <button type="button" id="tabDeparture" onclick="switchActionType('انصراف')" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-700 hover:text-black">تسجيل انصراف</button>
+            </div>
+
+            <form id="attendanceForm" class="space-y-4" novalidate>
+                <input type="hidden" id="actionTypeField" value="حضور">
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">الاسم الرباعي</label>
+                    <input type="text" id="memberName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="أدخل اسمك كاملاً" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">الرقم القومي (14 رقم)</label>
+                    <input type="tel" id="nationalId" maxlength="14" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="مثال: 29001011234567" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">البريد الإلكتروني</label>
+                    <input type="email" id="memberEmail" dir="ltr" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-left" placeholder="name@example.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">البرامج التي تدرس بها (اختر برنامجاً واحداً على الأقل)</label>
+                    <div class="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <label class="flex items-center space-x-3 space-x-reverse cursor-pointer"><input type="checkbox" name="prog_chk" value="البرنامج العام" class="checkbox-custom"><span class="text-gray-700 text-sm">البرنامج العام</span></label>
+                        <label class="flex items-center space-x-3 space-x-reverse cursor-pointer"><input type="checkbox" name="prog_chk" value="برنامج تكنولوجيا الاشعة والتصوير الطبى" class="checkbox-custom"><span class="text-gray-700 text-sm">برنامج تكنولوجيا الاشعة والتصوير الطبى</span></label>
+                        <label class="flex items-center space-x-3 space-x-reverse cursor-pointer"><input type="checkbox" name="prog_chk" value="برنامج تكنولوجيا المختبرات الطبية" class="checkbox-custom"><span class="text-gray-700 text-sm">برنامج تكنولوجيا المختبرات الطبية</span></label>
+                        <label class="flex items-center space-x-3 space-x-reverse cursor-pointer"><input type="checkbox" name="prog_chk" value="برنامج تكنولوجيا الرعاية الطبية الحرجة والعاجلة" class="checkbox-custom"><span class="text-gray-700 text-sm">برنامج تكنولوجيا الرعاية الطبية الحرجة والعاجلة</span></label>
+                        <label class="flex items-center space-x-3 space-x-reverse cursor-pointer"><input type="checkbox" name="prog_chk" value="برنامج تكنولوجيا الاحصاء ونظم المعلومات الطبية" class="checkbox-custom"><span class="text-gray-700 text-sm">برنامج تكنولوجيا الاحصاء ونظم المعلومات الطبية</span></label>
+                    </div>
+                </div>
+
+                <!-- تحديد الموقع الفعلي -->
+                <div class="pt-2">
+                    <button type="button" id="geoBtn" onclick="requestLocation()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <span id="geoBtnText">تحديد موقعي الحالي (GPS) 📍</span>
+                    </button>
+                    <p id="geoStatus" class="text-xs text-center text-gray-500 mt-1">اضغط لتأكيد موقعك وتفعيل زر التسجيل</p>
+                    <button type="button" id="openDirectBtn" onclick="openDirect()" class="hidden w-full mt-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-bold py-2 rounded-lg">فتح التطبيق في نافذة مستقلة</button>
+                </div>
+
+                <input type="hidden" id="locationField">
+                <input type="hidden" id="latitudeField">
+                <input type="hidden" id="longitudeField">
+                <input type="hidden" id="accuracyField">
+
+                <div id="timeStatusMsg" class="text-center text-sm font-bold p-3 rounded-lg hidden"></div>
+
+                <button type="submit" id="submitBtn" disabled class="w-full bg-blue-600 text-white font-bold py-3.5 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 mt-4 opacity-50 cursor-not-allowed transition-colors">
+                    <span id="btnText">إتمام وتسجيل الحضور</span>
+                </button>
+
+                <div id="successAlert" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-center mt-4 font-bold shadow-sm"></div>
+                <div id="errorAlert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-center mt-4 font-bold shadow-sm"></div>
+            </form>
+
+            <p class="text-center mt-4"><a href="#" onclick="withdrawConsent(); return false;" class="text-xs text-gray-500 underline">سحب الموافقة على استخدام الموقع</a></p>
+        </div>
+    </main>
+
+    <!-- لوحة الإدارة -->
+    <main id="adminView" class="max-w-7xl mx-auto mt-8 px-4 hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">لوحة الإدارة (سجل الحضور والانصراف)</h2>
+            <button onclick="closeAdmin()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">العودة للتسجيل</button>
+        </div>
+        <div class="glass-effect rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button onclick="exportToCSV()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">تحميل سجل اليوم (Excel)</button>
+                <button onclick="downloadFullSheet()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded-lg">تحميل الشيت كامل (CSV)</button>
+                <button id="dashBtn" onclick="openDashboard()" class="hidden bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded-lg">فتح الداشبورد في الشيت</button>
+                <button onclick="fetchAdminData()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">تحديث</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg overflow-hidden border text-sm">
+                    <thead class="bg-blue-900 text-white">
+                        <tr>
+                            <th class="py-3 px-3 text-right">#</th>
+                            <th class="py-3 px-3 text-right">الاسم</th>
+                            <th class="py-3 px-3 text-right">الرقم القومي</th>
+                            <th class="py-3 px-3 text-right">البرنامج</th>
+                            <th class="py-3 px-3 text-right">نوع التسجيل</th>
+                            <th class="py-3 px-3 text-right">الإيميل</th>
+                            <th class="py-3 px-3 text-right">الموقع الجغرافي</th>
+                            <th class="py-3 px-3 text-right">حالة الموقع</th>
+                            <th class="py-3 px-3 text-right">الوقت</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody"><tr><td colspan="9" class="text-center py-6">جاري التحميل...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ===================== الإعدادات =====================
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysoGMJO3979lEgTuDTRMXjrfSShz6sjMCJGTvLdn7xjqWnZJDAdbP3lQPaB6jBkeEc/exec';
+
+        // اختياري: رابط مباشر للصفحة (لو الموقع الجغرافي اتحجب داخل Google Sites)
+        const APP_DIRECT_URL = '';
+        // اختياري: رابط الشيت (لفتح الداشبورد من لوحة الإدارة)
+        const DASHBOARD_URL = '';
+
+        // للفحص السريع فقط؛ القرار النهائي دايمًا من السيرفر (لازم تتطابق مع CONFIG في الباك إند)
+        const CAMPUS_POINTS = [
+            { lat: 31.4486027, lng: 31.4791828 },
+            { lat: 31.4496051, lng: 31.4824477 }
+        ];
+        const RADIUS_M = 500;
+        const MAX_ACCURACY_M = 150;
+        const LOCATION_MAX_AGE_MS = 3 * 60 * 1000; // صلاحية تحديد الموقع قبل طلب إعادته
+
+        const CONSENT_VERSION = '1.0';
+        const CONSENT_KEY = 'att_consent_v';
+
+        let currentActionType = "حضور";
+        let locationReady = false;
+        let locationTime = 0;
+        let submitting = false;
+
+        // ===================== أدوات مساعدة =====================
+        const $ = id => document.getElementById(id);
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371000, r = Math.PI / 180;
+            const dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+            return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+        function nearestDistance(lat, lng) {
+            return Math.round(Math.min(...CAMPUS_POINTS.map(p => haversine(p.lat, p.lng, lat, lng))));
+        }
+        function showAlert(type, text) {
+            const ok = $('successAlert'), er = $('errorAlert');
+            ok.classList.add('hidden'); er.classList.add('hidden');
+            const box = type === 'ok' ? ok : er;
+            box.textContent = text;
+            box.classList.remove('hidden');
+            setTimeout(() => box.classList.add('hidden'), type === 'ok' ? 6000 : 10000);
+        }
+
+        // ===================== الموافقة =====================
+        function hasConsent() {
+            try { return localStorage.getItem(CONSENT_KEY) === CONSENT_VERSION; } catch (e) { return sessionStorage.getItem(CONSENT_KEY) === CONSENT_VERSION; }
+        }
+        function storeConsent(v) {
+            try { v ? localStorage.setItem(CONSENT_KEY, CONSENT_VERSION) : localStorage.removeItem(CONSENT_KEY); }
+            catch (e) { v ? sessionStorage.setItem(CONSENT_KEY, CONSENT_VERSION) : sessionStorage.removeItem(CONSENT_KEY); }
+        }
+        function showConsent() { $('consentCheck').checked = false; $('consentModal').classList.remove('hidden'); }
+        function acceptConsent() {
+            if (!$('consentCheck').checked) return alert("لازم تحددي مربع الموافقة أولاً.");
+            storeConsent(true);
+            $('consentModal').classList.add('hidden');
+            requestLocation();
+        }
+        function declineConsent() {
+            $('consentModal').classList.add('hidden');
+            alert("لا يمكن إتمام التسجيل بدون الموافقة على استخدام الموقع الجغرافي.");
+        }
+        function withdrawConsent() {
+            storeConsent(false);
+            resetLocationButton();
+            alert("تم سحب موافقتك. ستُطلب منك الموافقة مرة أخرى عند التسجيل التالي.");
+        }
+
+        // ===================== التبديل بين حضور/انصراف =====================
+        function switchActionType(type) {
+            currentActionType = type;
+            $('actionTypeField').value = type;
+            const tabAtt = $('tabAttendance'), tabDep = $('tabDeparture'), btnText = $('btnText');
+            if (type === 'حضور') {
+                tabAtt.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-blue-900 text-white shadow";
+                tabDep.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-700 hover:text-black";
+                btnText.textContent = "إتمام وتسجيل الحضور";
+            } else {
+                tabDep.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-emerald-800 text-white shadow";
+                tabAtt.className = "flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-700 hover:text-black";
+                btnText.textContent = "إتمام وتسجيل الانصراف";
+            }
+            resetLocationButton();
+            checkTime();
+        }
+
+        // ===================== التوقيت =====================
+        function checkTime() {
+            const now = new Date();
+            const total = now.getHours() * 60 + now.getMinutes();
+            const msg = $('timeStatusMsg');
+            let isValid = false;
+            const bad = t => { msg.textContent = t; msg.className = "text-center text-sm font-bold p-3 rounded-lg bg-red-100 text-red-700 block mb-2"; };
+            const good = t => { msg.textContent = t; msg.className = "text-center text-xs font-bold p-2 rounded-lg bg-green-50 text-green-700 block mb-2"; };
+
+            if (currentActionType === 'حضور') {
+                if (total < 9 * 60) bad("لم يبدأ وقت تسجيل الحضور بعد (يبدأ من 9:00 صباحاً) ❌");
+                else if (total > 12 * 60) bad("انتهى وقت تسجيل الحضور لهذا اليوم، ولا يمكن التسجيل الآن. ❌");
+                else { good("وقت تسجيل الحضور متاح ✅"); isValid = true; }
+            } else {
+                if (total < 16 * 60) bad("تسجيل الانصراف يبدأ من الساعة 4:00 مساءً ❌");
+                else { good("وقت تسجيل الانصراف متاح ✅"); isValid = true; }
+            }
+            if (!submitting && !locationReady) $('geoBtn').disabled = !isValid;
+            return isValid;
+        }
+
+        // ===================== الموقع الجغرافي (فعلي) =====================
+        function resetLocationButton() {
+            locationReady = false;
+            $('geoBtn').className = "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 transition-colors cursor-pointer";
+            $('geoBtnText').textContent = 'تحديد موقعي الحالي (GPS) 📍';
+            $('geoStatus').textContent = 'اضغط لتأكيد موقعك وتفعيل زر التسجيل';
+            $('geoStatus').className = "text-xs text-center text-gray-500 mt-1";
+            $('geoBtn').disabled = false;
+            $('openDirectBtn').classList.add('hidden');
+            ['locationField', 'latitudeField', 'longitudeField', 'accuracyField'].forEach(id => $(id).value = '');
+            const s = $('submitBtn');
+            s.disabled = true;
+            s.className = "w-full bg-blue-600 text-white font-bold py-3.5 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 mt-4 opacity-50 cursor-not-allowed transition-colors";
+        }
+
+        function locationFailed(text) {
+            locationReady = false;
+            $('geoBtn').disabled = false;
+            $('geoBtn').className = "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 transition-colors cursor-pointer";
+            $('geoBtnText').textContent = 'إعادة تحديد الموقع 📍';
+            $('geoStatus').textContent = text;
+            $('geoStatus').className = "text-xs text-center text-red-600 font-bold mt-1";
+        }
+
+        function requestLocation() {
+            if (!checkTime()) return alert("عذراً، الوقت الحالي غير متاح لتسجيل " + currentActionType);
+            if (!hasConsent()) return showConsent();
+            if (!navigator.geolocation) return locationFailed("المتصفح لا يدعم تحديد الموقع الجغرافي.");
+
+            $('geoBtn').disabled = true;
+            $('geoBtnText').textContent = 'جاري تحديد موقعك...';
+            $('geoStatus').textContent = 'اسمحي للمتصفح بالوصول للموقع عند ظهور الطلب';
+            $('geoStatus').className = "text-xs text-center text-gray-500 mt-1";
+
+            navigator.geolocation.getCurrentPosition(onPosition, onPositionError,
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+        }
+
+        function onPosition(pos) {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+            if (acc > MAX_ACCURACY_M)
+                return locationFailed("دقة تحديد الموقع ضعيفة (" + Math.round(acc) + " م). فعّلي GPS وحاولي من مكان مفتوح.");
+            const d = nearestDistance(lat, lng);
+            if (d > RADIUS_M)
+                return locationFailed("أنت خارج نطاق الحرم الجامعي (تبعد حوالي " + d + " م) ❌");
+
+            $('locationField').value = "جامعة المنصورة الأهلية - الدقهلية - مصر";
+            $('latitudeField').value = lat;
+            $('longitudeField').value = lng;
+            $('accuracyField').value = Math.round(acc);
+            locationReady = true;
+            locationTime = Date.now();
+
+            $('geoBtn').className = "w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 cursor-default";
+            $('geoBtnText').textContent = 'تم تحديد الموقع بنجاح ✅';
+            $('geoStatus').textContent = 'أنت داخل نطاق الحرم الجامعي (على بُعد ' + d + ' م من المركز)';
+            $('geoStatus').className = "text-xs text-center text-green-600 font-bold mt-1";
+
+            const s = $('submitBtn');
+            s.disabled = false;
+            s.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-lg shadow-md flex justify-center items-center gap-2 mt-4 transition-colors cursor-pointer";
+        }
+
+        function onPositionError(err) {
+            const inFrame = window.self !== window.top;
+            let t = "تعذر تحديد الموقع. حاولي مرة أخرى.";
+            if (err.code === 1) {
+                t = "تم رفض إذن الموقع. اسمحي للمتصفح بالوصول للموقع من إعدادات الموقع ثم أعيدي المحاولة.";
+                if (inFrame) {
+                    t += " (قد يمنع Google Sites تحديد الموقع داخل الصفحة المضمّنة.)";
+                    if (APP_DIRECT_URL) $('openDirectBtn').classList.remove('hidden');
+                }
+            } else if (err.code === 2) t = "تعذر الحصول على الموقع. تأكدي من تفعيل GPS والإنترنت.";
+            else if (err.code === 3) t = "انتهت مهلة تحديد الموقع. حاولي مرة أخرى من مكان مفتوح.";
+            locationFailed(t);
+        }
+        function openDirect() { if (APP_DIRECT_URL) window.open(APP_DIRECT_URL, '_blank'); }
+
+        // ===================== إرسال التسجيل =====================
+        $('attendanceForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            if (submitting) return;
+            if (!checkTime()) return alert("وقت التسجيل غير متاح حالياً.");
+
+            const name = $('memberName').value.trim();
+            const nationalId = $('nationalId').value.trim();
+            const email = $('memberEmail').value.trim();
+            if (!name) return alert("الرجاء إدخال الاسم الرباعي.");
+            if (!/^\d{14}$/.test(nationalId)) return alert("الرقم القومي يجب أن يتكون من 14 رقماً بالضبط.");
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return alert("الرجاء إدخال بريد إلكتروني صحيح.");
+            const checked = document.querySelectorAll('input[name="prog_chk"]:checked');
+            if (checked.length === 0) return alert("الرجاء اختيار برنامج واحد على الأقل.");
+            if (!hasConsent()) return showConsent();
+            if (!locationReady || Date.now() - locationTime > LOCATION_MAX_AGE_MS) {
+                resetLocationButton();
+                return alert("الرجاء تحديد موقعك مرة أخرى قبل التسجيل.");
+            }
+
+            const programs = Array.from(checked).map(cb => cb.value).join(' ، ');
+            const now = new Date();
+            const submitBtn = $('submitBtn');
+            submitting = true;
+            submitBtn.disabled = true;
+            $('btnText').textContent = 'جاري التسجيل...';
+
+            const fd = new URLSearchParams();
+            fd.append('name', name);
+            fd.append('nationalId', nationalId);
+            fd.append('email', email);
+            fd.append('program', programs);
+            fd.append('actionType', currentActionType);
+            fd.append('consent', 'true');
+            fd.append('dateStr', now.toLocaleDateString('ar-EG'));
+            fd.append('timeStr', now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }));
+            fd.append('location', $('locationField').value);
+            fd.append('latitude', $('latitudeField').value);
+            fd.append('longitude', $('longitudeField').value);
+            fd.append('accuracy', $('accuracyField').value);
+
+            const action = currentActionType;
+            try {
+                const res = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: fd
+                });
+                const data = await res.json();
+                if (data.result === 'success') {
+                    showAlert('ok', '✅ تم تسجيل ' + action + ' بنجاح');
+                } else {
+                    showAlert('err', '❌ ' + (data.message || 'تعذر إتمام التسجيل.'));
+                }
+            } catch (err) {
+                showAlert('err', '❌ تعذر الاتصال بالخادم أو الرد غير مفهوم. تأكدي من الإنترنت، وراجعي السجل قبل إعادة المحاولة.');
+            } finally {
+                submitting = false;
+                $('btnText').textContent = action === 'حضور' ? 'إتمام وتسجيل الحضور' : 'إتمام وتسجيل الانصراف';
+                resetLocationButton();
+                checkTime();
+            }
+        });
+
+        // ===================== لوحة الإدارة =====================
+        function getKey() { return sessionStorage.getItem('att_admin_key') || ''; }
+
+        function openAdmin() {
+            let key = getKey();
+            if (!key) {
+                key = prompt("أدخل مفتاح لوحة الإدارة:");
+                if (key === null) return;
+                key = key.trim();
+                if (!key) return;
+            }
+            fetchAdminData(key, true);
+        }
+
+        function closeAdmin() {
+            sessionStorage.removeItem('att_admin_key');
+            $('adminView').classList.add('hidden');
+            $('registrationView').classList.remove('hidden');
+        }
+
+        function cairoDay(d) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d); }
+
+        function fetchAdminData(keyArg, firstOpen) {
+            const key = (typeof keyArg === 'string' && keyArg) ? keyArg : getKey();
+            const tbody = $('attendanceTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6">جاري تحميل البيانات من الشيت...</td></tr>';
+
+            fetch(SCRIPT_URL + '?req=data&key=' + encodeURIComponent(key))
+            .then(res => res.json())
+            .then(data => {
+                if (!Array.isArray(data)) {
+                    sessionStorage.removeItem('att_admin_key');
+                    alert(data && data.code === 'UNAUTHORIZED' ? "مفتاح الإدارة غير صحيح!" : "تعذر تحميل البيانات.");
+                    if (firstOpen) closeAdmin();
+                    return;
+                }
+                sessionStorage.setItem('att_admin_key', key);
+                $('registrationView').classList.add('hidden');
+                $('adminView').classList.remove('hidden');
+                if (DASHBOARD_URL) $('dashBtn').classList.remove('hidden');
+
+                const today = cairoDay(new Date());
+                const legacyToday = new Date().toLocaleDateString('ar-EG');
+                const todayData = data.filter(r => r.timestamp ? cairoDay(new Date(r.timestamp)) === today : r.dateStr === legacyToday);
+
+                tbody.innerHTML = '';
+                if (todayData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 font-bold">لا توجد عمليات مسجلة اليوم حتى الآن.</td></tr>';
+                    return;
+                }
+
+                todayData.forEach((row, i) => {
+                    const lat = row.latitude || "", lng = row.longitude || "";
+                    const locText = esc(row.location || "-");
+                    const locHtml = (lat && lng)
+                        ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}" target="_blank" rel="noopener" class="text-blue-600 font-bold hover:underline" title="عرض على الخريطة">${locText} 📍</a>`
+                        : locText;
+                    const actionType = row.actionType || "حضور";
+                    const typeBadge = actionType.includes('حضور')
+                        ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-bold">${esc(actionType)} 🟢</span>`
+                        : `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-bold">${esc(actionType)} 🟠</span>`;
+                    const statusText = row.locationStatus || "غير محدد";
+                    const statusBadge = statusText.includes('داخل')
+                        ? `<span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold">داخل النطاق ✅</span>`
+                        : `<span class="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-bold">خارج النطاق ❌</span>`;
+
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-3">${i + 1}</td>
+                            <td class="py-3 px-3 font-bold">${esc(row.name)}</td>
+                            <td class="py-3 px-3 font-mono">${esc(row.nationalId)}</td>
+                            <td class="py-3 px-3 text-xs">${esc(row.program)}</td>
+                            <td class="py-3 px-3">${typeBadge}</td>
+                            <td class="py-3 px-3 text-xs" dir="ltr">${esc(row.email)}</td>
+                            <td class="py-3 px-3">${locHtml}</td>
+                            <td class="py-3 px-3">${statusBadge}</td>
+                            <td class="py-3 px-3 text-green-600 font-bold dir-ltr text-right">${esc(row.timeStr)}</td>
+                        </tr>`);
+                });
+            })
+            .catch(() => {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-red-500 font-bold">حدث خطأ أثناء جلب البيانات.</td></tr>';
+            });
+        }
+
+        function exportToCSV() {
+            const csv = [];
+            document.querySelectorAll("#adminView table tr").forEach(row => {
+                if (row.querySelectorAll("td").length === 1) return;
+                const cols = [];
+                row.querySelectorAll("td, th").forEach(c => cols.push('"' + c.innerText.replace(/"/g, '""') + '"'));
+                csv.push(cols.join(","));
+            });
+            if (csv.length <= 1) return alert("لا توجد بيانات لتحميلها.");
+            saveBlob(csv.join("\n"), `سجل_الحضور_والانصراف_${cairoDay(new Date())}.csv`);
+        }
+
+        function downloadFullSheet() {
+            fetch(SCRIPT_URL + '?req=csv&key=' + encodeURIComponent(getKey()))
+            .then(r => r.text())
+            .then(t => {
+                if (t.trim().startsWith('{')) return alert("غير مصرح أو حدث خطأ.");
+                saveBlob(t, `الشيت_كامل_${cairoDay(new Date())}.csv`);
+            })
+            .catch(() => alert("تعذر تحميل الشيت."));
+        }
+
+        function saveBlob(text, filename) {
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([text.charAt(0) === '\uFEFF' ? text : '\uFEFF' + text], { type: "text/csv;charset=utf-8;" }));
+            link.download = filename;
+            link.click();
+        }
+
+        function openDashboard() { if (DASHBOARD_URL) window.open(DASHBOARD_URL, '_blank'); }
+
+        // ===================== التشغيل الأولي =====================
+        checkTime();
+        setInterval(checkTime, 30000);
+    </script>
+</body>
+</html>
