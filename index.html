@@ -254,9 +254,9 @@
             const good = t => { msg.textContent = t; msg.className = "text-center text-xs font-bold p-2 rounded-lg bg-green-50 text-green-700 block mb-2"; };
 
             if (currentActionType === 'حضور') {
-                if (total < 9 * 60) bad("لم يبدأ وقت تسجيل الحضور بعد (يبدأ من 9:00 صباحاً) ❌");
-                else if (total > 12 * 60) bad("انتهى وقت تسجيل الحضور لهذا اليوم، ولا يمكن التسجيل الآن. ❌");
-                else { good("وقت تسجيل الحضور متاح ✅"); isValid = true; }
+                if (total < 8 * 60 + 30) bad("لم يبدأ وقت تسجيل الحضور بعد (يبدأ من 8:30 صباحاً) ❌");
+                else if (total > 10 * 60 + 30) bad("انتهى وقت تسجيل الحضور لهذا اليوم (ينتهي 10:30 صباحاً) ❌");
+                else { good("وقت تسجيل الحضور متاح (من 8:30 حتى 10:30 صباحاً) ✅"); isValid = true; }
             } else {
                 if (total < 15 * 60 + 30) bad("تسجيل الانصراف يبدأ من الساعة 3:30 مساءً ❌");
                 else if (total > 17 * 60 + 30) bad("انتهى وقت تسجيل الانصراف لهذا اليوم (ينتهي 5:30 مساءً) ❌");
