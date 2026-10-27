@@ -454,6 +454,8 @@ function checkTime() {
   if (m < w.start) setPill('soon', 'تسجيل ' + noun + ' يبدأ ' + w.startLabel);
   else if (m > w.end) setPill('closed', 'انتهى وقت تسجيل ' + noun + ' اليوم');
   else { setPill('open', 'تسجيل ' + noun + ' متاح الآن'); ok = true; }
+  // السماح بمحاولة الانصراف قبل الموعد بنصف ساعة (السيرفر هو الحكم، وهناك استثناءات لأعضاء بعينهم)
+  if (!ok && currentActionType === 'انصراف' && m >= w.start - 30 && m <= w.end) ok = true;
   timeOk = ok;
 
   if (!locationReady && !submitting) {
