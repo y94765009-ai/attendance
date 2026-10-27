@@ -270,11 +270,11 @@ td a{color:var(--teal-deep);font-weight:600}
         <div class="field">
           <label for="memberEmail">البريد الإلكتروني</label>
           <input class="input input--ltr" type="email" id="memberEmail" name="email" autocomplete="email" placeholder="name@example.com" required>
-          <p class="hint">استخدم نفس البريد في الحضور والانصراف.</p>
+          <p class="hint">يُرجى استخدام نفس البريد في الحضور والانصراف.</p>
           <p class="err" id="err-email" hidden></p>
         </div>
         <fieldset class="field">
-          <legend>البرنامج (اختر برنامجًا واحدًا على الأقل)</legend>
+          <legend>البرنامج (يُرجى اختيار برنامج واحد على الأقل)</legend>
           <div class="opts">
             <label class="opt"><input type="checkbox" name="prog_chk" value="البرنامج العام"><span class="opt__box"><svg class="ic"><use href="#i-check"/></svg></span><span>البرنامج العام</span></label>
             <label class="opt"><input type="checkbox" name="prog_chk" value="برنامج تكنولوجيا الاشعة والتصوير الطبى"><span class="opt__box"><svg class="ic"><use href="#i-check"/></svg></span><span>برنامج تكنولوجيا الأشعة والتصوير الطبي</span></label>
@@ -295,7 +295,7 @@ td a{color:var(--teal-deep);font-weight:600}
           </div>
           <div>
             <p class="geo__title" id="geoTitle">لم يُحدَّد الموقع بعد</p>
-            <p class="geo__sub" id="geoStatus" aria-live="polite">اضغط الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.</p>
+            <p class="geo__sub" id="geoStatus" aria-live="polite">يُرجى الضغط على الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.</p>
           </div>
         </div>
         <button type="button" class="btn btn--ghost" id="geoBtn"><span id="geoBtnText">تحديد موقعي الحالي</span></button>
@@ -309,6 +309,7 @@ td a{color:var(--teal-deep);font-weight:600}
         <div class="alert" id="errorAlert" role="alert" hidden></div>
       </section>
     </form>
+    <p class="foot" id="profileNote" hidden>تُحفظ بياناتك على هذا الجهاز فقط لتسهيل التسجيل القادم. <button type="button" class="link" id="clearProfileBtn">مسح البيانات المحفوظة</button></p>
     <p class="foot"><button type="button" class="link" id="withdrawBtn">سحب الموافقة على استخدام الموقع</button></p>
   </div>
 
@@ -322,6 +323,7 @@ td a{color:var(--teal-deep);font-weight:600}
       <div class="ticket__row"><dt>الوقت</dt><dd id="rTime"></dd></div>
       <div class="ticket__row" id="rDistRow"><dt>البُعد عن مركز الحرم</dt><dd id="rDist"></dd></div>
     </dl>
+    <p class="hint" id="rNote" style="text-align:center;margin:12px 0 4px"></p>
     <button type="button" class="btn btn--quiet" id="newBtn">رجوع</button>
   </article>
 </main>
@@ -364,7 +366,7 @@ td a{color:var(--teal-deep);font-weight:600}
     ولا تُستخدم البيانات لغير أغراض الحضور والانصراف.
   </p>
   <label class="check"><input type="checkbox" id="consentCheck">قرأت الإقرار وأوافق عليه</label>
-  <p class="err" id="consentErr" hidden>حدّد مربع الموافقة للمتابعة.</p>
+  <p class="err" id="consentErr" hidden>يلزم تحديد مربع الموافقة للمتابعة.</p>
   <div class="dlg__actions">
     <button type="button" class="btn btn--primary" id="consentYes">موافق ومتابعة</button>
     <button type="button" class="btn btn--quiet" id="consentNo">لا أوافق</button>
@@ -514,7 +516,7 @@ function setSubmitEnabled(on) {
 function resetLocationButton() {
   locationReady = false;
   ['locationField', 'latitudeField', 'longitudeField', 'accuracyField'].forEach(id => $(id).value = '');
-  setGeo('idle', 'لم يُحدَّد الموقع بعد', 'اضغط الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.');
+  setGeo('idle', 'لم يُحدَّد الموقع بعد', 'يُرجى الضغط على الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.');
   $('geoBtnText').textContent = 'تحديد موقعي الحالي';
   $('geoBtn').disabled = !timeOk;
   setSubmitEnabled(false);
@@ -543,10 +545,10 @@ function requestLocation() {
 function onPosition(pos) {
   const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
   if (acc > MAX_ACCURACY_M)
-    return locationFailed('دقة تحديد الموقع ضعيفة (' + toAr(Math.round(acc)) + ' م). فعّل GPS وجرّب من مكان مفتوح.');
+    return locationFailed('دقة تحديد الموقع ضعيفة (' + toAr(Math.round(acc)) + ' م). يُرجى تفعيل GPS والمحاولة من مكان مفتوح.');
   const d = nearestDistance(lat, lng);
   if (d > RADIUS_M)
-    return locationFailed('أنت خارج نطاق الحرم الجامعي، على بُعد حوالي ' + toAr(d) + ' م.');
+    return locationFailed('موقعك خارج نطاق الحرم الجامعي، على بُعد حوالي ' + toAr(d) + ' م. يُرجى الاقتراب من الحرم الجامعي ثم إعادة المحاولة.');
 
   $('locationField').value = 'جامعة المنصورة الأهلية - الدقهلية - مصر';
   $('latitudeField').value = lat;
@@ -563,12 +565,12 @@ function onPosition(pos) {
 
 function onPositionError(err) {
   const inFrame = window.self !== window.top;
-  let t = 'تعذّر تحديد الموقع. حاول مرة أخرى.';
+  let t = 'تعذّر تحديد الموقع. يُرجى المحاولة مرة أخرى.';
   if (err.code === 1) {
-    t = 'رُفض إذن الموقع. اسمح للمتصفح بالوصول إلى الموقع من إعدادات الموقع ثم أعد المحاولة.';
+    t = 'رُفض إذن الموقع. يُرجى السماح للمتصفح بالوصول إلى الموقع من إعدادات الجهاز أو المتصفح، ثم إعادة المحاولة.';
     if (inFrame) { t += ' قد يمنع الموقع المضيف تحديد الموقع داخل هذه الصفحة.'; $('frameBanner').hidden = false; }
-  } else if (err.code === 2) t = 'تعذّر الحصول على الموقع. تأكد من تفعيل GPS والاتصال بالإنترنت.';
-  else if (err.code === 3) t = 'انتهت مهلة تحديد الموقع. جرّب من مكان مفتوح.';
+  } else if (err.code === 2) t = 'تعذّر الحصول على الموقع. يُرجى التأكد من تفعيل GPS والاتصال بالإنترنت.';
+  else if (err.code === 3) t = 'انتهت مهلة تحديد الموقع. يُرجى المحاولة من مكان مفتوح.';
   locationFailed(t);
 }
 
@@ -587,6 +589,63 @@ function switchActionType(type) {
   checkTime();
 }
 
+// ===================== رسائل الأخطاء (محايدة للجنسين، مع الإجراء المطلوب) =====================
+function friendlyError(data) {
+  const code = data && data.code, msg = (data && data.message) || '';
+  const noun = currentActionType === 'حضور' ? 'الحضور' : 'الانصراف';
+  const M = {
+    DUPLICATE: 'تم تسجيل ' + noun + ' اليوم بالفعل، ولا يمكن التسجيل أكثر من مرة في اليوم.',
+    NO_CHECKIN: 'لا يمكن تسجيل الانصراف قبل تسجيل الحضور اليوم. إذا تم تسجيل الحضور، يُرجى التواصل مع الإدارة.',
+    TOO_EARLY: 'لم يبدأ وقت تسجيل ' + noun + ' بعد. يُرجى المحاولة في الموعد المحدد.',
+    TOO_LATE: 'انتهى وقت تسجيل ' + noun + ' لهذا اليوم. للاستفسار يُرجى التواصل مع الإدارة.',
+    OUT_OF_RANGE: 'موقعك خارج نطاق الحرم الجامعي. يُرجى الاقتراب من الحرم ثم إعادة المحاولة.',
+    LOW_ACCURACY: 'دقة تحديد الموقع ضعيفة. يُرجى تفعيل GPS والمحاولة من مكان مفتوح.',
+    NO_LOCATION: 'يلزم السماح بالوصول إلى الموقع الجغرافي لإتمام التسجيل.',
+    NO_CONSENT: 'يلزم الموافقة على إقرار استخدام الموقع الجغرافي أولًا.',
+    BAD_EMAIL: 'البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.',
+    BAD_NID: 'الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.',
+    MISSING_NAME: 'يُرجى إدخال الاسم.',
+    NOT_MEMBER: 'الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.',
+    MEMBER_INACTIVE: 'هذا الحساب موقوف. يُرجى التواصل مع الإدارة.',
+    BUSY: 'النظام مشغول لحظيًا. يُرجى المحاولة مرة أخرى بعد قليل.',
+    SERVER: 'حدث خطأ غير متوقع. يُرجى المحاولة بعد قليل، وإن تكرر الأمر يُرجى التواصل مع الإدارة.'
+  };
+  if (code === 'EMAIL_MISMATCH') {
+    const m = msg.match(/يبدأ بـ\s*(\S+?)\.\s/);
+    return 'هذا الرقم القومي مسجّل ببريد إلكتروني ' + (m ? 'يبدأ بـ ' + m[1] : 'مختلف') + '. يُرجى استخدام نفس البريد، أو التواصل مع الإدارة لتصحيحه.';
+  }
+  if (code === 'EMAIL_OTHER_NID') {
+    const m = msg.match(/ينتهي بـ\s*(\d{4})/);
+    return 'هذا البريد الإلكتروني مسجّل برقم قومي آخر' + (m ? ' ينتهي بـ ' + toAr(m[1]) : '') + '. يُرجى مراجعة الرقم القومي المكتوب، أو التواصل مع الإدارة.';
+  }
+  return M[code] || msg || 'تعذّر إتمام التسجيل.';
+}
+
+// ===================== حفظ البيانات على الجهاز =====================
+const PROFILE_KEY = 'att_profile_v1';
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) { return null; }
+}
+function saveProfile(name, nid, email, progs) {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name, nid: nid, email: email, progs: progs })); } catch (e) {}
+  syncProfileUi();
+}
+function clearProfile() {
+  try { localStorage.removeItem(PROFILE_KEY); } catch (e) {}
+  ['memberName', 'nationalId', 'memberEmail'].forEach(id => $(id).value = '');
+  document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.checked = false);
+  syncProfileUi(); refreshSteps();
+}
+function applyProfile() {
+  const p = loadProfile();
+  if (!p) return;
+  $('memberName').value = p.name || '';
+  $('nationalId').value = p.nid || '';
+  $('memberEmail').value = p.email || '';
+  document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.checked = (p.progs || []).indexOf(cb.value) !== -1);
+}
+function syncProfileUi() { $('profileNote').hidden = !loadProfile(); }
+
 // ===================== إرسال التسجيل =====================
 async function submitForm(e) {
   e.preventDefault();
@@ -598,16 +657,16 @@ async function submitForm(e) {
   let first = null;
   const bad = (errId, msg, inputId) => { setErr(errId, msg, inputId); first = first || $(inputId || errId); };
   setErr('err-name', '', 'memberName'); setErr('err-nid', '', 'nationalId'); setErr('err-email', '', 'memberEmail'); setErr('err-prog', '');
-  if (!name) bad('err-name', 'أدخل الاسم الرباعي.', 'memberName');
-  if (!validNid()) bad('err-nid', 'الرقم القومي يتكون من 14 رقمًا بالضبط.', 'nationalId');
-  if (!validEmail()) bad('err-email', 'أدخل بريدًا إلكترونيًا صحيحًا.', 'memberEmail');
-  if (!validProg()) { setErr('err-prog', 'اختر برنامجًا واحدًا على الأقل.'); first = first || document.querySelector('input[name="prog_chk"]'); }
+  if (!name) bad('err-name', 'يُرجى إدخال الاسم الرباعي.', 'memberName');
+  if (!validNid()) bad('err-nid', 'الرقم القومي يتكون من ١٤ رقمًا بالضبط، ويُرجى التأكد من كتابته بدقة.', 'nationalId');
+  if (!validEmail()) bad('err-email', 'يُرجى إدخال بريد إلكتروني صحيح (مثال: name@example.com).', 'memberEmail');
+  if (!validProg()) { setErr('err-prog', 'يُرجى اختيار برنامج واحد على الأقل.'); first = first || document.querySelector('input[name="prog_chk"]'); }
   if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
   if (!hasConsent()) return showConsent();
   if (!locationReady || Date.now() - locationTime > LOCATION_MAX_AGE_MS) {
     resetLocationButton();
-    setGeo('error', 'انتهت صلاحية تحديد الموقع', 'حدّد موقعك مرة أخرى ثم أكمل التسجيل.');
+    setGeo('error', 'انتهت صلاحية تحديد الموقع', 'يُرجى تحديد الموقع مرة أخرى ثم إكمال التسجيل.');
     return;
   }
 
@@ -631,11 +690,11 @@ async function submitForm(e) {
   try {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
-    if (data.result === 'success') showReceipt(action, name, now, data.distance);
-    else { const a = $('errorAlert'); a.textContent = data.message || 'تعذّر إتمام التسجيل.'; a.hidden = false; a.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    if (data.result === 'success') { saveProfile(name, nationalId, email, Array.from(document.querySelectorAll('input[name="prog_chk"]:checked')).map(cb => cb.value)); showReceipt(action, name, now, data.distance); }
+    else { const a = $('errorAlert'); a.textContent = friendlyError(data); a.hidden = false; a.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   } catch (err) {
     const a = $('errorAlert');
-    a.textContent = 'تعذّر الاتصال بالخادم أو الرد غير مفهوم. تأكد من الإنترنت وراجع سجل اليوم قبل إعادة المحاولة.';
+    a.textContent = 'تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت قبل إعادة المحاولة، وقد يكون التسجيل قد تم بالفعل — يمكن التأكد من الإدارة.';
     a.hidden = false;
   } finally {
     submitting = false;
@@ -653,6 +712,7 @@ function showReceipt(action, name, when, distance) {
   const hasD = distance !== undefined && distance !== null && distance !== '';
   $('rDistRow').hidden = !hasD;
   if (hasD) $('rDist').textContent = toAr(distance) + ' م';
+  $('rNote').textContent = (action === 'حضور' ? 'يبدأ تسجيل الانصراف الساعة ' + WINDOWS['انصراف'].startLabel + '. ' : '') + 'يمكن تصوير هذه الشاشة كإثبات للتسجيل.';
   $('formCard').hidden = true;
   $('receipt').hidden = false;
   $('receipt').scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -797,6 +857,10 @@ $('nationalId').addEventListener('input', e => { e.target.value = toAscii(e.targ
 $('memberName').addEventListener('input', () => { setErr('err-name', '', 'memberName'); refreshSteps(); });
 $('memberEmail').addEventListener('input', () => { setErr('err-email', '', 'memberEmail'); refreshSteps(); });
 document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.addEventListener('change', () => { setErr('err-prog', ''); refreshSteps(); }));
+
+$('clearProfileBtn').addEventListener('click', clearProfile);
+applyProfile();
+syncProfileUi();
 
 if (window.self !== window.top) $('frameBanner').hidden = false;
 
