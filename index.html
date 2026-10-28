@@ -190,6 +190,40 @@ td a{color:var(--teal-deep);font-weight:600}
   *{animation:none!important;transition:none!important}
   .pulse path{stroke-dashoffset:0}
 }
+
+/* ---------- ملفي ---------- */
+.shell#profileView{margin-top:16px}
+.cal__dow{font-size:11px!important}
+.pf-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px}
+.pf-title{margin:0;font-size:20px;font-weight:700}
+.pf-sub{margin:2px 0 0;font-size:14px;color:var(--ink-soft)}
+.pf-month{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 12px}
+.pf-month strong{font-size:17px}
+.pf-nav{width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:#fff;display:grid;place-items:center;font-size:20px;line-height:1}
+.pf-nav:disabled{opacity:.35;cursor:default}
+.pf-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+.pf-tile{background:var(--bg);border-radius:12px;padding:10px 12px}
+.pf-tile b{display:block;font-size:22px;line-height:1.3}
+.pf-tile span{font-size:13px;color:var(--ink-soft)}
+.num{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.pf-pos{color:var(--ok)} .pf-neg{color:var(--bad)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal__dow{text-align:center;font-size:12px;color:var(--ink-soft);padding:2px 0}
+.cal__day{aspect-ratio:1/1.08;min-height:46px;border-radius:10px;border:1.5px solid transparent;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:2px;font-size:14px;line-height:1.2;color:var(--ink-soft)}
+.cal__day small{font-size:11px;font-weight:700}
+.cal__day.is-on{background:var(--teal-tint);color:var(--ink);border-color:transparent}
+.cal__day.is-early{background:var(--ok-tint);color:var(--ok)}
+.cal__day.is-late{background:var(--bad-tint);color:var(--bad)}
+.cal__day.is-today{border-color:var(--teal)}
+.cal__day.is-sel{outline:3px solid var(--teal-glow);outline-offset:1px}
+.cal__day:disabled{cursor:default}
+.pf-detail{margin:14px 0 0;background:var(--bg);border-radius:14px;padding:14px}
+.pf-detail h3{margin:0 0 8px;font-size:16px}
+.pf-detail dl{margin:0;display:grid;gap:6px}
+.pf-detail .row{display:flex;justify-content:space-between;gap:10px;font-size:15px}
+.pf-detail dt{color:var(--ink-soft)} .pf-detail dd{margin:0;font-weight:600;text-align:left}
+.pf-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0;font-size:12.5px;color:var(--ink-soft)}
+.pf-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-1px;margin-inline-end:5px}
 </style>
 </head>
 <body>
@@ -312,6 +346,7 @@ td a{color:var(--teal-deep);font-weight:600}
     <p class="foot" id="profileNote" hidden>تُحفظ بياناتك على هذا الجهاز فقط لتسهيل التسجيل القادم. <button type="button" class="link" id="clearProfileBtn">مسح البيانات المحفوظة</button></p>
     <p class="foot"><button type="button" class="link" id="withdrawBtn">سحب الموافقة على استخدام الموقع</button></p>
   </div>
+  <button type="button" class="btn btn--quiet" id="profileBtn" style="margin-top:12px">ملفي: سجل حضوري هذا الشهر</button>
 
   <article class="ticket" id="receipt" hidden aria-live="polite">
     <div class="ticket__seal"><svg class="ic"><use href="#i-check"/></svg></div>
@@ -326,6 +361,47 @@ td a{color:var(--teal-deep);font-weight:600}
     <p class="hint" id="rNote" style="text-align:center;margin:12px 0 4px"></p>
     <button type="button" class="btn btn--quiet" id="newBtn">رجوع</button>
   </article>
+</main>
+
+<main class="shell" id="profileView" hidden>
+  <div class="card">
+    <div class="pf-head">
+      <div><h1 class="pf-title">ملفي</h1><p class="pf-sub" id="pfWho">سجل حضوري هذا الشهر</p></div>
+      <button type="button" class="btn btn--quiet btn--small" id="pfBack"><svg class="ic"><use href="#i-back"/></svg>رجوع</button>
+    </div>
+
+    <form id="pfForm" novalidate>
+      <div class="field">
+        <label for="pfNid">الرقم القومي</label>
+        <input class="input input--ltr" type="text" id="pfNid" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="14 رقمًا">
+      </div>
+      <div class="field">
+        <label for="pfEmail">البريد الإلكتروني المستخدم في التسجيل</label>
+        <input class="input input--ltr" type="email" id="pfEmail" autocomplete="email" placeholder="name@example.com">
+        <p class="hint">لا يظهر هذا الملف لأي شخص آخر، ولا يُعرض إلا بعد مطابقة الرقم القومي والبريد.</p>
+      </div>
+      <button type="submit" class="btn btn--primary" id="pfGo"><span id="pfGoText">عرض ملفي</span></button>
+      <div class="alert" id="pfErr" role="alert" hidden></div>
+    </form>
+
+    <section id="pfBody" hidden>
+      <div class="pf-month">
+        <button type="button" class="pf-nav" id="pfPrev" aria-label="الشهر السابق">›</button>
+        <strong id="pfMonthLabel"></strong>
+        <button type="button" class="pf-nav" id="pfNext" aria-label="الشهر التالي">‹</button>
+      </div>
+      <div class="pf-tiles" id="pfTiles"></div>
+      <div class="cal" id="pfCal" role="grid" aria-label="أيام الحضور"></div>
+      <div class="pf-legend">
+        <span><i style="background:var(--ok-tint)"></i>حضور قبل الموعد (+)</span>
+        <span><i style="background:var(--bad-tint)"></i>حضور متأخر (−)</span>
+        <span><i style="background:var(--teal-tint)"></i>في الموعد</span>
+      </div>
+      <p class="hint" id="pfHint">اضغط على أي يوم ملوّن لعرض تفاصيله.</p>
+      <div class="pf-detail" id="pfDetail" hidden></div>
+      <button type="button" class="btn btn--quiet" id="pfExit" style="margin-top:14px">خروج</button>
+    </section>
+  </div>
 </main>
 
 <main class="wide" id="adminView" hidden>
@@ -609,6 +685,8 @@ function friendlyError(data) {
     MISSING_NAME: 'يُرجى إدخال الاسم.',
     NOT_MEMBER: 'الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.',
     MEMBER_INACTIVE: 'هذا الحساب موقوف. يُرجى التواصل مع الإدارة.',
+    PROFILE_AUTH: 'البيانات غير مطابقة للمسجّل. يُرجى التأكد من الرقم القومي والبريد الإلكتروني المستخدم في التسجيل.',
+    TOO_MANY: 'محاولات كثيرة. يُرجى المحاولة بعد ١٠ دقائق.',
     BUSY: 'النظام مشغول لحظيًا. يُرجى المحاولة مرة أخرى بعد قليل.',
     SERVER: 'حدث خطأ غير متوقع. يُرجى المحاولة بعد قليل، وإن تكرر الأمر يُرجى التواصل مع الإدارة.'
   };
@@ -859,6 +937,131 @@ $('nationalId').addEventListener('input', e => { e.target.value = toAscii(e.targ
 $('memberName').addEventListener('input', () => { setErr('err-name', '', 'memberName'); refreshSteps(); });
 $('memberEmail').addEventListener('input', () => { setErr('err-email', '', 'memberEmail'); refreshSteps(); });
 document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.addEventListener('change', () => { setErr('err-prog', ''); refreshSteps(); }));
+
+
+// ===================== ملفي =====================
+const pf = { nid: '', email: '', month: '', data: null, sel: 0 };
+const WEEK = ['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'];
+const fmtHM = s => { const [h, m] = String(s).split(':').map(Number); const h12 = ((h + 11) % 12) + 1; return toAr(h12 + ':' + ('0' + m).slice(-2)) + (h >= 12 ? ' م' : ' ص'); };
+const numSpan = t => '<span class="num">' + esc(t) + '</span>';
+const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + toAr(Math.abs(n));
+const hoursWord = h => h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : (h >= 3 && h <= 10) ? toAr(h) + ' ساعات' : toAr(h) + ' ساعة';
+const durTxt = min => { const h = Math.floor(min / 60), m = min % 60; return [h ? hoursWord(h) : '', (m || !h) ? toAr(m) + ' دقيقة' : ''].filter(Boolean).join(' و'); };
+const curMonth = () => cairoDay(new Date()).slice(0, 7);
+const monthLabel = ym => new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)));
+const shiftMonth = (ym, d) => { const t = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + d, 1)); return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2); };
+
+function showProfileView(on) {
+  $('profileView').hidden = !on;
+  $('registrationView').hidden = on; $('hero').hidden = on;
+  if (on) window.scrollTo(0, 0);
+}
+function openProfile() {
+  const p = loadProfile();
+  $('pfNid').value = pf.nid || (p && p.nid) || '';
+  $('pfEmail').value = pf.email || (p && p.email) || '';
+  $('pfErr').hidden = true;
+  showProfileView(true);
+}
+function leaveProfile() {
+  pf.nid = pf.email = ''; pf.data = null;
+  $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfWho').textContent = 'سجل حضوري هذا الشهر';
+  $('pfCal').innerHTML = ''; $('pfDetail').hidden = true;
+  showProfileView(false);
+}
+
+async function loadProfileData(month) {
+  const err = $('pfErr'); err.hidden = true;
+  const fd = new URLSearchParams();
+  fd.append('action', 'profile'); fd.append('nationalId', pf.nid); fd.append('email', pf.email); fd.append('month', month);
+  $('pfGo').disabled = true; $('pfGoText').textContent = 'جارٍ التحميل…';
+  ['pfPrev', 'pfNext'].forEach(id => $(id).disabled = true);
+  try {
+    const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
+    const data = await res.json();
+    if (data.result !== 'success') { pf.data = null; $('pfBody').hidden = true; $('pfForm').hidden = false; err.textContent = friendlyError(data); err.hidden = false; return; }
+    pf.data = data; pf.month = data.month; pf.sel = 0;
+    $('pfForm').hidden = true; $('pfBody').hidden = false;
+    $('pfWho').textContent = data.name;
+    renderProfile();
+  } catch (e) {
+    $('pfBody').hidden = true; $('pfForm').hidden = false;
+    err.textContent = 'تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت والمحاولة مرة أخرى.'; err.hidden = false;
+  } finally {
+    $('pfGo').disabled = false; $('pfGoText').textContent = 'عرض ملفي';
+    $('pfPrev').disabled = false; $('pfNext').disabled = !pf.month || pf.month >= curMonth();
+  }
+}
+
+function renderProfile() {
+  const d = pf.data, s = d.summary, ym = d.month;
+  $('pfMonthLabel').textContent = monthLabel(ym);
+  $('pfNext').disabled = ym >= curMonth();
+  const cls = n => n > 0 ? 'pf-pos' : n < 0 ? 'pf-neg' : '';
+  $('pfTiles').innerHTML =
+    '<div class="pf-tile"><b>' + toAr(s.days) + '</b><span>أيام الحضور</span></div>' +
+    '<div class="pf-tile"><b class="' + cls(s.net) + '">' + numSpan(signed(s.net)) + ' <small>د</small></b><span>صافي الدقائق (+ تبكير / − تأخير)</span></div>' +
+    '<div class="pf-tile"><b class="' + cls(s.avg) + '">' + numSpan(signed(s.avg)) + ' <small>د</small></b><span>متوسط التبكير/التأخير يوميًا</span></div>' +
+    '<div class="pf-tile"><b>' + toAr(s.late) + '</b><span>أيام التأخير</span></div>';
+
+  const [Y, M] = ym.split('-').map(Number);
+  const first = (new Date(Date.UTC(Y, M - 1, 1)).getUTCDay() + 1) % 7;   // السبت أول الأسبوع
+  const dim = new Date(Date.UTC(Y, M, 0)).getUTCDate();
+  const byDay = {}; d.days.forEach(x => byDay[x.day] = x);
+  const today = cairoDay(new Date());
+  let h = WEEK.map(w => '<div class="cal__dow">' + w + '</div>').join('');
+  for (let i = 0; i < first; i++) h += '<div></div>';
+  for (let n = 1; n <= dim; n++) {
+    const x = byDay[n];
+    const isToday = today === ym + '-' + ('0' + n).slice(-2);
+    if (!x) { h += '<button type="button" class="cal__day' + (isToday ? ' is-today' : '') + '" disabled>' + toAr(n) + '</button>'; continue; }
+    const k = x.delta > 0 ? 'is-early' : x.delta < 0 ? 'is-late' : 'is-on';
+    h += '<button type="button" class="cal__day ' + k + (isToday ? ' is-today' : '') + (pf.sel === n ? ' is-sel' : '') + '" data-day="' + n + '" aria-label="يوم ' + toAr(n) + '">' +
+         toAr(n) + '<small>' + numSpan(signed(x.delta)) + '</small></button>';
+  }
+  $('pfCal').innerHTML = h;
+  $('pfHint').hidden = !d.days.length && false;
+  $('pfHint').textContent = d.days.length ? 'اضغط على أي يوم ملوّن لعرض تفاصيله.' : 'لا توجد تسجيلات حضور في هذا الشهر.';
+  $('pfDetail').hidden = true;
+  if (pf.sel) showDay(pf.sel);
+}
+
+function showDay(n) {
+  const x = pf.data.days.find(v => v.day === n); if (!x) return;
+  pf.sel = n;
+  document.querySelectorAll('#pfCal .cal__day').forEach(b => b.classList.toggle('is-sel', +b.dataset.day === n));
+  const ws = pf.data.workStart, we = pf.data.workEnd;
+  const inTxt = x.delta > 0 ? 'قبل الموعد بـ ' + toAr(x.delta) + ' دقيقة' : x.delta < 0 ? 'متأخر ' + toAr(-x.delta) + ' دقيقة' : 'في الموعد تمامًا';
+  let rows = '<div class="row"><dt>الحضور</dt><dd>' + esc(fmtHM(x.in)) + '</dd></div>' +
+             '<div class="row"><dt>مقارنة بموعد ' + esc(fmtHM(ws)) + '</dt><dd class="' + (x.delta > 0 ? 'pf-pos' : x.delta < 0 ? 'pf-neg' : '') + '">' + esc(inTxt) + ' (' + numSpan(signed(x.delta)) + ')</dd></div>';
+  if (x.out) {
+    const o = x.outDelta > 0 ? 'بعد الموعد بـ ' + toAr(x.outDelta) + ' دقيقة' : x.outDelta < 0 ? 'قبل الموعد بـ ' + toAr(-x.outDelta) + ' دقيقة' : 'في الموعد تمامًا';
+    rows += '<div class="row"><dt>الانصراف</dt><dd>' + esc(fmtHM(x.out)) + '</dd></div>' +
+            '<div class="row"><dt>مقارنة بموعد ' + esc(fmtHM(we)) + '</dt><dd>' + esc(o) + '</dd></div>' +
+            '<div class="row"><dt>مدة التواجد</dt><dd>' + esc(durTxt(x.minutes)) + '</dd></div>';
+  } else {
+    rows += '<div class="row"><dt>الانصراف</dt><dd>' + (x.auto ? 'تلقائي (لم يُسجَّل انصراف)' : 'لم يُسجَّل') + '</dd></div>';
+  }
+  const el = $('pfDetail');
+  el.innerHTML = '<h3>يوم ' + toAr(n) + ' ' + esc(monthLabel(pf.data.month).split(' ')[0]) + '</h3><dl>' + rows + '</dl>';
+  el.hidden = false;
+}
+
+$('profileBtn').addEventListener('click', openProfile);
+$('pfBack').addEventListener('click', leaveProfile);
+$('pfExit').addEventListener('click', leaveProfile);
+$('pfNid').addEventListener('input', e => { e.target.value = toAscii(e.target.value).replace(/\D/g, '').slice(0, 14); });
+$('pfForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const nid = $('pfNid').value.trim(), em = $('pfEmail').value.trim(), err = $('pfErr');
+  if (!/^\d{14}$/.test(nid)) { err.textContent = 'الرقم القومي يتكون من ١٤ رقمًا بالضبط.'; err.hidden = false; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { err.textContent = 'يُرجى إدخال بريد إلكتروني صحيح.'; err.hidden = false; return; }
+  pf.nid = nid; pf.email = em;
+  loadProfileData(curMonth());
+});
+$('pfPrev').addEventListener('click', () => loadProfileData(shiftMonth(pf.month, -1)));
+$('pfNext').addEventListener('click', () => { if (pf.month < curMonth()) loadProfileData(shiftMonth(pf.month, 1)); });
+$('pfCal').addEventListener('click', e => { const b = e.target.closest('.cal__day[data-day]'); if (b) showDay(+b.dataset.day); });
 
 $('clearProfileBtn').addEventListener('click', clearProfile);
 applyProfile();
