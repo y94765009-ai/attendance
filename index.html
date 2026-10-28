@@ -224,6 +224,26 @@ td a{color:var(--teal-deep);font-weight:600}
 .pf-detail dt{color:var(--ink-soft)} .pf-detail dd{margin:0;font-weight:600;text-align:left}
 .pf-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0;font-size:12.5px;color:var(--ink-soft)}
 .pf-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-1px;margin-inline-end:5px}
+
+.pcard{display:flex;align-items:center;gap:14px;width:100%;margin-top:14px;padding:14px 16px;border:1px solid rgba(255,255,255,.6);border-radius:18px;text-align:start;color:var(--ink);
+  background:linear-gradient(135deg,#fff 0%,var(--teal-tint) 100%);box-shadow:0 8px 24px rgba(15,42,51,.10);transition:transform .15s ease,box-shadow .15s ease}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,42,51,.16)}
+.pcard:active{transform:translateY(0)}
+.pcard__ic{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--teal) 0%,var(--teal-deep) 100%);box-shadow:0 6px 14px rgba(10,107,107,.35)}
+.pcard__ic .ic{width:24px;height:24px}
+.pcard__tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.pcard__tx b{font-size:17px}
+.pcard__tx small{font-size:13px;color:var(--ink-soft)}
+.pcard__go{color:var(--teal);width:22px;height:22px;transform:scaleX(-1)}
+.pf-tile{background:linear-gradient(135deg,#fff,var(--bg));border:1px solid var(--line);box-shadow:0 2px 8px rgba(15,42,51,.05)}
+.cal__day{border-radius:12px}
+.cal__day.is-early{background:linear-gradient(135deg,var(--ok-tint),#fff)}
+.cal__day.is-late{background:linear-gradient(135deg,var(--bad-tint),#fff)}
+.pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.pcard{transition:none}}
+.top__btns{display:flex;align-items:center;gap:8px;flex:none}
+.icon-btn--accent{background:linear-gradient(135deg,var(--teal) 0%,var(--teal-deep) 100%);border-color:rgba(92,200,191,.55);box-shadow:0 4px 12px rgba(10,107,107,.4)}
+.icon-btn--accent:hover{background:linear-gradient(135deg,#0d7f7f,var(--teal))}
 </style>
 </head>
 <body>
@@ -239,6 +259,7 @@ td a{color:var(--teal-deep);font-weight:600}
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
   <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
 </svg>
@@ -252,9 +273,14 @@ td a{color:var(--teal-deep);font-weight:600}
         <p class="brand__sub">كلية تكنولوجيا العلوم الصحية التطبيقية</p>
       </div>
     </div>
-    <button type="button" class="icon-btn" id="adminBtn" aria-label="لوحة الإدارة" title="لوحة الإدارة">
-      <svg class="ic"><use href="#i-shield"/></svg>
-    </button>
+    <div class="top__btns">
+      <button type="button" class="icon-btn icon-btn--accent" id="profileBtn" aria-label="ملفي" title="ملفي">
+        <svg class="ic"><use href="#i-user"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="adminBtn" aria-label="لوحة الإدارة" title="لوحة الإدارة">
+        <svg class="ic"><use href="#i-shield"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -346,7 +372,6 @@ td a{color:var(--teal-deep);font-weight:600}
     <p class="foot" id="profileNote" hidden>تُحفظ بياناتك على هذا الجهاز فقط لتسهيل التسجيل القادم. <button type="button" class="link" id="clearProfileBtn">مسح البيانات المحفوظة</button></p>
     <p class="foot"><button type="button" class="link" id="withdrawBtn">سحب الموافقة على استخدام الموقع</button></p>
   </div>
-  <button type="button" class="btn btn--quiet" id="profileBtn" style="margin-top:12px">ملفي: سجل حضوري هذا الشهر</button>
 
   <article class="ticket" id="receipt" hidden aria-live="polite">
     <div class="ticket__seal"><svg class="ic"><use href="#i-check"/></svg></div>
@@ -366,7 +391,7 @@ td a{color:var(--teal-deep);font-weight:600}
 <main class="shell" id="profileView" hidden>
   <div class="card">
     <div class="pf-head">
-      <div><h1 class="pf-title">ملفي</h1><p class="pf-sub" id="pfWho">سجل حضوري هذا الشهر</p></div>
+      <div><h1 class="pf-title"><svg class="ic" style="vertical-align:-3px;margin-inline-end:6px"><use href="#i-user"/></svg>ملفي</h1><p class="pf-sub" id="pfWho">سجل حضوري هذا الشهر</p></div>
       <button type="button" class="btn btn--quiet btn--small" id="pfBack"><svg class="ic"><use href="#i-back"/></svg>رجوع</button>
     </div>
 
