@@ -234,6 +234,9 @@ td a{color:var(--teal-deep);font-weight:600}
 .pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
 .top__btns{display:flex;align-items:center;gap:8px;flex:none}
 body.is-admin #profileBtn{display:none}
+#adminBtn{display:none}
+body.show-admin #adminBtn{display:inline-flex}
+.muted{color:var(--ink-soft);font-size:13px}
 .who{background:none;border:0;padding:0;font-weight:700;color:var(--ink);text-align:start;text-decoration:underline dotted var(--gold);text-underline-offset:4px;cursor:pointer}
 .who:hover{color:var(--teal-deep);text-decoration-style:solid}
 .pf-info{margin:0 0 14px;background:var(--gold-tint);border:1px solid rgba(198,145,46,.35);border-radius:14px;padding:12px 14px;display:grid;gap:6px;font-size:14px}
@@ -463,7 +466,7 @@ body.is-admin #profileBtn{display:none}
   <div class="tbl-wrap">
     <table>
       <thead><tr>
-        <th>#</th><th>الاسم</th><th>الرقم القومي</th><th>البرنامج</th><th>النوع</th><th>البريد</th><th>الموقع</th><th>حالة الموقع</th><th>الوقت</th>
+        <th>#</th><th>الاسم</th><th>الرقم القومي</th><th>البرنامج</th><th>الحضور</th><th>الانصراف</th><th>البريد</th><th>الموقع</th><th>حالة الموقع</th>
       </tr></thead>
       <tbody id="attendanceTableBody"></tbody>
     </table>
@@ -882,42 +885,61 @@ function fetchAdminData(key, firstOpen) {
     });
 }
 
+// تجميع عمليات اليوم: صف واحد لكل عضو (حضوره وانصرافه في نفس الصف)
+function groupMembers(rows) {
+  const map = {};
+  rows.slice().reverse().forEach(r => {           // من الأقدم للأحدث
+    const id = String(r.nationalId);
+    const g = map[id] || (map[id] = { id: id, name: r.name, program: r.program, email: r.email, inRow: null, outRow: null, outAuto: false, outside: false });
+    g.name = r.name || g.name; g.program = r.program || g.program; g.email = r.email || g.email;
+    if (!String(r.locationStatus || '').includes('داخل')) g.outside = true;
+    const type = String(r.actionType || 'حضور');
+    if (type.indexOf('انصراف') === 0) {
+      const auto = type.indexOf('تلقائي') !== -1;
+      if (!auto) { g.outRow = r; g.outAuto = false; }       // الانصراف اليدوي الأحدث يغلب
+      else if (!g.outRow) { g.outRow = r; g.outAuto = true; }  // التلقائي فقط لو مفيش يدوي
+    } else if (!g.inRow) { g.inRow = r; }
+  });
+  return Object.keys(map).map(k => map[k]).reverse();   // الأحدث أولًا
+}
+
 function renderAdmin() {
-  const rows = adm.all;
-  const uniq = f => new Set(rows.filter(f).map(r => String(r.nationalId))).size;
-  const inCount = uniq(r => (r.actionType || 'حضور') === 'حضور');
-  const outCount = uniq(r => String(r.actionType || '').indexOf('انصراف') === 0);
-  const outside = rows.filter(r => !String(r.locationStatus || '').includes('داخل')).length;
+  const all = groupMembers(adm.all);
+  const inCount = all.filter(g => g.inRow).length;
+  const outCount = all.filter(g => g.outRow).length;
+  const outside = all.filter(g => g.outside).length;
   $('stats').innerHTML =
-    `<div class="stat"><span class="stat__n">${toAr(rows.length)}</span><span class="stat__l">عمليات اليوم</span></div>` +
+    `<div class="stat"><span class="stat__n">${toAr(all.length)}</span><span class="stat__l">أعضاء سجّلوا اليوم</span></div>` +
     `<div class="stat"><span class="stat__n">${toAr(inCount)}</span><span class="stat__l">سجّلوا الحضور</span></div>` +
     `<div class="stat"><span class="stat__n">${toAr(outCount)}</span><span class="stat__l">سجّلوا الانصراف</span></div>` +
     `<div class="stat ${outside ? 'stat--warn' : ''}"><span class="stat__n">${toAr(outside)}</span><span class="stat__l">خارج النطاق</span></div>`;
 
   const q = adm.query.trim().toLowerCase();
-  const list = q ? rows.filter(r => (String(r.name) + ' ' + String(r.program)).toLowerCase().includes(q)) : rows;
+  const list = q ? all.filter(g => (String(g.name) + ' ' + String(g.program)).toLowerCase().includes(q)) : all;
   const tbody = $('attendanceTableBody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (rows.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا توجد عمليات مسجّلة اليوم حتى الآن.') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (all.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا توجد عمليات مسجّلة اليوم حتى الآن.') + '</td></tr>';
     return;
   }
-  tbody.innerHTML = list.map((row, i) => {
-    const type = row.actionType || 'حضور';
-    const typeBadge = `<span class="badge ${type.includes('حضور') ? 'badge--in' : 'badge--out'}">${esc(type)}</span>`;
-    const inside = String(row.locationStatus || '').includes('داخل');
-    const stBadge = `<span class="badge ${inside ? 'badge--ok' : 'badge--bad'}">${inside ? 'داخل النطاق' : 'خارج النطاق'}</span>`;
-    const loc = (row.latitude && row.longitude)
-      ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(row.latitude)},${encodeURIComponent(row.longitude)}" target="_blank" rel="noopener">الخريطة</a>` : '—';
+  tbody.innerHTML = list.map((g, i) => {
+    const inTxt = g.inRow ? `<span class="badge badge--in">${esc(g.inRow.timeStr)}</span>` : '<span class="muted">لم يُسجَّل</span>';
+    const outTxt = g.outRow
+      ? (g.outAuto ? `<span class="badge badge--out">تلقائي ${esc(g.outRow.timeStr)}</span>` : `<span class="badge badge--out">${esc(g.outRow.timeStr)}</span>`)
+      : '<span class="muted">لم يُسجَّل</span>';
+    const stBadge = `<span class="badge ${g.outside ? 'badge--bad' : 'badge--ok'}">${g.outside ? 'خارج النطاق' : 'داخل النطاق'}</span>`;
+    const src = g.inRow || g.outRow;
+    const loc = (src && src.latitude && src.longitude)
+      ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(src.latitude)},${encodeURIComponent(src.longitude)}" target="_blank" rel="noopener">الخريطة</a>` : '—';
     return `<tr>
       <td data-l="#">${toAr(i + 1)}</td>
-      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(row.nationalId)}" data-name="${esc(row.name)}" title="عرض كل بيانات العضو">${esc(row.name)}</button></td>
-      <td data-l="الرقم القومي"><span class="num">${esc(adm.showNid ? row.nationalId : maskNid(row.nationalId))}</span></td>
-      <td data-l="البرنامج">${esc(row.program)}</td>
-      <td data-l="النوع">${typeBadge}</td>
-      <td data-l="البريد"><span class="num">${esc(row.email)}</span></td>
+      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(g.id)}" data-name="${esc(g.name)}" title="عرض كل بيانات العضو">${esc(g.name)}</button></td>
+      <td data-l="الرقم القومي"><span class="num">${esc(adm.showNid ? g.id : maskNid(g.id))}</span></td>
+      <td data-l="البرنامج">${esc(g.program)}</td>
+      <td data-l="الحضور">${inTxt}</td>
+      <td data-l="الانصراف">${outTxt}</td>
+      <td data-l="البريد"><span class="num">${esc(g.email)}</span></td>
       <td data-l="الموقع">${loc}</td>
-      <td data-l="حالة الموقع">${stBadge}</td>
-      <td data-l="الوقت">${esc(row.timeStr)}</td></tr>`;
+      <td data-l="حالة الموقع">${stBadge}</td></tr>`;
   }).join('');
 }
 
@@ -926,9 +948,13 @@ function csvCell(v, asText) {
   return asText ? '"=""' + s + '"""' : '"' + s + '"';
 }
 function exportToCSV() {
-  if (!adm.all.length) return alert('لا توجد بيانات لتحميلها.');
-  const lines = [['الاسم', 'الرقم القومي', 'البرنامج', 'النوع', 'البريد', 'حالة الموقع', 'الوقت'].map(h => csvCell(h)).join(',')];
-  adm.all.forEach(r => lines.push([csvCell(r.name), csvCell(r.nationalId, true), csvCell(r.program), csvCell(r.actionType || 'حضور'), csvCell(r.email), csvCell(r.locationStatus), csvCell(r.timeStr)].join(',')));
+  const g = groupMembers(adm.all);
+  if (!g.length) return alert('لا توجد بيانات لتحميلها.');
+  const lines = [['الاسم', 'الرقم القومي', 'البرنامج', 'وقت الحضور', 'وقت الانصراف', 'نوع الانصراف', 'البريد', 'حالة الموقع'].map(h => csvCell(h)).join(',')];
+  g.forEach(m => lines.push([csvCell(m.name), csvCell(m.id, true), csvCell(m.program),
+    csvCell(m.inRow ? m.inRow.timeStr : ''), csvCell(m.outRow ? m.outRow.timeStr : ''),
+    csvCell(m.outRow ? (m.outAuto ? 'تلقائي' : 'يدوي') : ''), csvCell(m.email),
+    csvCell(m.outside ? 'خارج النطاق' : 'داخل النطاق')].join(',')));
   saveBlob(lines.join('\n'), 'سجل_الحضور_والانصراف_' + cairoDay(new Date()) + '.csv');
 }
 function downloadFullSheet() {
@@ -1143,6 +1169,10 @@ $('pfCal').addEventListener('click', e => { const b = e.target.closest('.cal__da
 $('clearProfileBtn').addEventListener('click', clearProfile);
 applyProfile();
 syncProfileUi();
+
+// زر الإدارة مخفي عن الأعضاء؛ يظهر فقط بالرابط الذي ينتهي بـ #admin
+try { if (location.hash === '#admin' || sessionStorage.getItem('att_admin_key')) document.body.classList.add('show-admin'); } catch (e) { if (location.hash === '#admin') document.body.classList.add('show-admin'); }
+window.addEventListener('hashchange', () => document.body.classList.toggle('show-admin', location.hash === '#admin' || !!getKey()));
 
 if (window.self !== window.top) $('frameBanner').hidden = false;
 
