@@ -238,6 +238,9 @@ body.is-admin #profileBtn{display:none}
 #adminBtn{display:none}
 body.show-admin #adminBtn{display:inline-flex}
 .muted{color:var(--ink-soft);font-size:13px}
+.flag{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:999px;background:var(--gold-tint);color:#6B4A0E;border:1px solid rgba(198,145,46,.5);font-size:12px;font-weight:700;white-space:nowrap}
+.flag-txt{font-size:12px;color:#6B4A0E;margin-top:2px;font-weight:400}
+#flagToggle.is-on{background:var(--gold-tint);color:#6B4A0E;box-shadow:inset 0 0 0 1.5px var(--gold)}
 .who{background:none;border:0;padding:0;font-weight:700;color:var(--ink);text-align:start;text-decoration:underline dotted var(--gold);text-underline-offset:4px;cursor:pointer}
 .who:hover{color:var(--teal-deep);text-decoration-style:solid}
 .pf-info{margin:0 0 14px;background:var(--gold-tint);border:1px solid rgba(198,145,46,.35);border-radius:14px;padding:12px 14px;display:grid;gap:6px;font-size:14px}
@@ -460,6 +463,7 @@ body.show-admin #adminBtn{display:inline-flex}
       <input class="input" type="search" id="searchBox" placeholder="ابحث بالاسم أو البرنامج" aria-label="بحث في سجل اليوم">
     </div>
     <button type="button" class="btn btn--quiet" id="nidToggle"><svg class="ic"><use href="#i-eye"/></svg><span id="nidToggleText">إظهار الأرقام القومية</span></button>
+    <button type="button" class="btn btn--quiet" id="flagToggle" aria-pressed="false"><svg class="ic"><use href="#i-alert"/></svg><span id="flagToggleText">للمراجعة</span></button>
     <button type="button" class="btn btn--quiet" id="refreshBtn"><svg class="ic"><use href="#i-refresh"/></svg>تحديث</button>
     <button type="button" class="btn btn--ghost" id="csvTodayBtn"><svg class="ic"><use href="#i-download"/></svg>سجل اليوم</button>
     <button type="button" class="btn btn--ghost" id="csvAllBtn"><svg class="ic"><use href="#i-download"/></svg>الشيت كامل</button>
@@ -844,7 +848,7 @@ function showReceipt(action, name, when, distance) {
 }
 
 // ===================== لوحة الإدارة =====================
-const adm = { all: [], showNid: false, query: '' };
+const adm = { all: [], showNid: false, query: '', onlyFlagged: false };
 const getKey = () => { try { return sessionStorage.getItem('att_admin_key') || ''; } catch (e) { return ''; } };
 const setKey = k => { try { k ? sessionStorage.setItem('att_admin_key', k) : sessionStorage.removeItem('att_admin_key'); } catch (e) {} };
 
@@ -870,7 +874,7 @@ function openAdmin() {
 }
 function closeAdmin() {
   setKey('');
-  adm.all = []; adm.query = ''; adm.showNid = false;        // بيانات الأعضاء تُمسح عند الخروج من الإدارة
+  adm.all = []; adm.query = ''; adm.showNid = false; adm.onlyFlagged = false;        // بيانات الأعضاء تُمسح عند الخروج من الإدارة
   $('attendanceTableBody').innerHTML = ''; $('stats').innerHTML = ''; $('searchBox').value = '';
   showView('home');
 }
@@ -909,9 +913,10 @@ function groupMembers(rows) {
   const map = {};
   rows.slice().reverse().forEach(r => {           // من الأقدم للأحدث
     const id = String(r.nationalId);
-    const g = map[id] || (map[id] = { id: id, name: r.name, program: r.program, email: r.email, inRow: null, outRow: null, outAuto: false, outside: false });
+    const g = map[id] || (map[id] = { id: id, name: r.name, program: r.program, email: r.email, inRow: null, outRow: null, outAuto: false, outside: false, flags: [] });
     g.name = r.name || g.name; g.program = r.program || g.program; g.email = r.email || g.email;
     if (!String(r.locationStatus || '').includes('داخل')) g.outside = true;
+    if (r.flags) String(r.flags).split(' | ').forEach(f => { if (f && g.flags.indexOf(f) === -1) g.flags.push(f); });
     const type = String(r.actionType || 'حضور');
     if (type.indexOf('انصراف') === 0) {
       const auto = type.indexOf('تلقائي') !== -1;
@@ -934,10 +939,15 @@ function renderAdmin() {
     `<div class="stat ${outside ? 'stat--warn' : ''}"><span class="stat__n">${toAr(outside)}</span><span class="stat__l">خارج النطاق</span></div>`;
 
   const q = adm.query.trim().toLowerCase();
-  const list = q ? all.filter(g => (String(g.name) + ' ' + String(g.program)).toLowerCase().includes(q)) : all;
+  const flaggedCount = all.filter(g => g.flags.length).length;
+  $('flagToggleText').textContent = 'للمراجعة' + (flaggedCount ? ' (' + toAr(flaggedCount) + ')' : '');
+  $('flagToggle').classList.toggle('is-on', adm.onlyFlagged);
+  $('flagToggle').setAttribute('aria-pressed', String(adm.onlyFlagged));
+  let list = q ? all.filter(g => (String(g.name) + ' ' + String(g.program)).toLowerCase().includes(q)) : all;
+  if (adm.onlyFlagged) list = list.filter(g => g.flags.length);
   const tbody = $('attendanceTableBody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (all.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا توجد عمليات مسجّلة اليوم حتى الآن.') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (adm.onlyFlagged ? 'لا يوجد أحد للمراجعة اليوم.' : all.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا توجد عمليات مسجّلة اليوم حتى الآن.') + '</td></tr>';
     return;
   }
   tbody.innerHTML = list.map((g, i) => {
@@ -951,7 +961,7 @@ function renderAdmin() {
       ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(src.latitude)},${encodeURIComponent(src.longitude)}" target="_blank" rel="noopener">الخريطة</a>` : '—';
     return `<tr>
       <td data-l="#">${toAr(i + 1)}</td>
-      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(g.id)}" data-name="${esc(g.name)}" title="عرض كل بيانات العضو">${esc(g.name)}</button></td>
+      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(g.id)}" data-name="${esc(g.name)}" title="عرض كل بيانات العضو">${esc(g.name)}</button>${g.flags.length ? ` <span class="flag" title="${esc(g.flags.join(' — '))}" tabindex="0" role="note">⚠ للمراجعة</span><div class="flag-txt">${esc(g.flags.join(' — '))}</div>` : ''}</td>
       <td data-l="الرقم القومي"><span class="num">${esc(adm.showNid ? g.id : maskNid(g.id))}</span></td>
       <td data-l="البرنامج">${esc(g.program)}</td>
       <td data-l="الحضور">${inTxt}</td>
@@ -969,11 +979,11 @@ function csvCell(v, asText) {
 function exportToCSV() {
   const g = groupMembers(adm.all);
   if (!g.length) return alert('لا توجد بيانات لتحميلها.');
-  const lines = [['الاسم', 'الرقم القومي', 'البرنامج', 'وقت الحضور', 'وقت الانصراف', 'نوع الانصراف', 'البريد', 'حالة الموقع'].map(h => csvCell(h)).join(',')];
+  const lines = [['الاسم', 'الرقم القومي', 'البرنامج', 'وقت الحضور', 'وقت الانصراف', 'نوع الانصراف', 'البريد', 'حالة الموقع', 'ملاحظات الأمان'].map(h => csvCell(h)).join(',')];
   g.forEach(m => lines.push([csvCell(m.name), csvCell(m.id, true), csvCell(m.program),
     csvCell(m.inRow ? m.inRow.timeStr : ''), csvCell(m.outRow ? m.outRow.timeStr : ''),
     csvCell(m.outRow ? (m.outAuto ? 'تلقائي' : 'يدوي') : ''), csvCell(m.email),
-    csvCell(m.outside ? 'خارج النطاق' : 'داخل النطاق')].join(',')));
+    csvCell(m.outside ? 'خارج النطاق' : 'داخل النطاق'), csvCell(m.flags.join(' | '))].join(',')));
   saveBlob(lines.join('\n'), 'سجل_الحضور_والانصراف_' + cairoDay(new Date()) + '.csv');
 }
 function downloadFullSheet() {
@@ -1012,6 +1022,7 @@ $('refreshBtn').addEventListener('click', () => fetchAdminData());
 $('searchBox').addEventListener('input', e => { adm.query = e.target.value; renderAdmin(); });
 $('nidToggle').addEventListener('click', () => { adm.showNid = !adm.showNid; $('nidToggleText').textContent = adm.showNid ? 'إخفاء الأرقام القومية' : 'إظهار الأرقام القومية'; renderAdmin(); });
 $('csvTodayBtn').addEventListener('click', exportToCSV);
+$('flagToggle').addEventListener('click', () => { adm.onlyFlagged = !adm.onlyFlagged; renderAdmin(); });
 $('csvAllBtn').addEventListener('click', downloadFullSheet);
 $('dashBtn').addEventListener('click', () => { if (DASHBOARD_URL) window.open(DASHBOARD_URL, '_blank', 'noopener'); });
 
