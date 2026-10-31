@@ -234,6 +234,7 @@ td a{color:var(--teal-deep);font-weight:600}
 .pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
 .top__btns{display:flex;align-items:center;gap:8px;flex:none}
 body.is-admin #profileBtn{display:none}
+.icon-btn[aria-current="true"]{box-shadow:0 0 0 2px var(--gold-soft)}
 #adminBtn{display:none}
 body.show-admin #adminBtn{display:inline-flex}
 .muted{color:var(--ink-soft);font-size:13px}
@@ -449,6 +450,7 @@ body.show-admin #adminBtn{display:inline-flex}
       <h1 class="adm-title">لوحة الإدارة</h1>
       <p class="adm-sub" id="admDate"></p>
     </div>
+    <button type="button" class="btn btn--quiet btn--small" id="hideAdminBtn" title="يخفي زر الإدارة من هذا الجهاز">إخفاء زر الإدارة من هذا الجهاز</button>
     <button type="button" class="btn btn--quiet btn--small" id="closeAdminBtn"><svg class="ic"><use href="#i-back"/></svg>العودة للتسجيل</button>
   </div>
   <div class="stats" id="stats"></div>
@@ -521,6 +523,9 @@ const WINDOWS = {
   'حضور':   { start: 8 * 60 + 30,  end: 10 * 60 + 30, startLabel: '٨:٣٠ صباحًا' },
   'انصراف': { start: 15 * 60 + 30, end: 17 * 60 + 30, startLabel: '٣:٣٠ مساءً', endLabel: '٥:٣٠ مساءً' }
 };
+
+// true = زر الإدارة ظاهر للجميع (الحماية بمفتاح الإدارة على السيرفر). false = مخفي ويظهر فقط بالرابط #admin أو على جهاز الأدمن
+const SHOW_ADMIN_BUTTON = true;
 
 const CONSENT_VERSION = '1.0';
 const CONSENT_KEY = 'att_consent_v';
@@ -843,6 +848,20 @@ const adm = { all: [], showNid: false, query: '' };
 const getKey = () => { try { return sessionStorage.getItem('att_admin_key') || ''; } catch (e) { return ''; } };
 const setKey = k => { try { k ? sessionStorage.setItem('att_admin_key', k) : sessionStorage.removeItem('att_admin_key'); } catch (e) {} };
 
+// ===== مدير الشاشات: شاشة واحدة فقط ظاهرة في كل مرة، ولكل زر محتواه المستقل =====
+// home = التسجيل، profile = ملفي (أو ملف عضو للأدمن)، admin = لوحة الإدارة
+function showView(name) {
+  if (name !== 'profile') resetProfileState();            // بيانات ملفي تُمسح عند مغادرتها
+  const ids = { home: 'registrationView', profile: 'profileView', admin: 'adminView' };
+  Object.keys(ids).forEach(k => { $(ids[k]).hidden = k !== name; });
+  $('hero').hidden = name !== 'home';
+  document.body.classList.toggle('is-admin', name === 'admin' || (name === 'profile' && pf.admin));
+  document.body.dataset.view = name;
+  $('profileBtn').setAttribute('aria-current', String(name === 'profile' && !pf.admin));
+  $('adminBtn').setAttribute('aria-current', String(name === 'admin' || (name === 'profile' && pf.admin)));
+  window.scrollTo(0, 0);
+}
+
 function openAdmin() {
   const key = getKey();
   if (key) return fetchAdminData(key, true);
@@ -851,8 +870,9 @@ function openAdmin() {
 }
 function closeAdmin() {
   setKey('');
-  document.body.classList.remove('is-admin');
-  $('adminView').hidden = true; $('registrationView').hidden = false; $('hero').hidden = false;
+  adm.all = []; adm.query = ''; adm.showNid = false;        // بيانات الأعضاء تُمسح عند الخروج من الإدارة
+  $('attendanceTableBody').innerHTML = ''; $('stats').innerHTML = ''; $('searchBox').value = '';
+  showView('home');
 }
 
 const maskNid = n => { n = String(n || ''); return n.length > 4 ? '••••••••••' + n.slice(-4) : n; };
@@ -867,12 +887,11 @@ function fetchAdminData(key, firstOpen) {
       if (!Array.isArray(data)) {
         setKey('');
         alert(data && data.code === 'UNAUTHORIZED' ? 'مفتاح الإدارة غير صحيح.' : 'تعذّر تحميل البيانات.');
-        if (firstOpen) closeAdmin();
         return;
       }
       setKey(key);
-      $('registrationView').hidden = true; $('hero').hidden = true; $('adminView').hidden = false;
-      document.body.classList.add('is-admin');
+      try { localStorage.setItem('att_admin_device', '1'); } catch (e) {}
+      showView('admin');
       if (DASHBOARD_URL) $('dashBtn').hidden = false;
       const today = cairoDay(new Date()), legacy = new Date().toLocaleDateString('ar-EG');
       adm.all = data.filter(r => r.timestamp ? cairoDay(new Date(r.timestamp)) === today : r.dateStr === legacy);
@@ -986,6 +1005,7 @@ $('consentNo').addEventListener('click', () => { $('consentDialog').close(); set
 
 $('adminBtn').addEventListener('click', openAdmin);
 $('closeAdminBtn').addEventListener('click', closeAdmin);
+$('hideAdminBtn').addEventListener('click', () => { try { localStorage.removeItem('att_admin_device'); } catch (e) {} if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search); closeAdmin(); syncAdminBtn(); });
 $('keyCancel').addEventListener('click', () => $('keyDialog').close());
 $('keyForm').addEventListener('submit', e => { e.preventDefault(); const k = $('keyInput').value.trim(); if (!k) return; $('keyDialog').close(); fetchAdminData(k, true); });
 $('refreshBtn').addEventListener('click', () => fetchAdminData());
@@ -1013,17 +1033,12 @@ const curMonth = () => cairoDay(new Date()).slice(0, 7);
 const monthLabel = ym => new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)));
 const shiftMonth = (ym, d) => { const t = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + d, 1)); return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2); };
 
-function showProfileView(on) {
-  $('profileView').hidden = !on;
-  $('registrationView').hidden = on; $('hero').hidden = on;
-  if (on) window.scrollTo(0, 0);
-}
 function openProfile() {
   const p = loadProfile();
   $('pfNid').value = pf.nid || (p && p.nid) || '';
   $('pfEmail').value = pf.email || (p && p.email) || '';
   $('pfErr').hidden = true;
-  showProfileView(true);
+  showView('profile');
 }
 function renderInfo(d) {
   const el = $('pfInfo');
@@ -1037,26 +1052,25 @@ function renderInfo(d) {
 }
 function openMemberAsAdmin(nid, name) {
   pf.admin = true; pf.nid = nid; pf.email = ''; pf.data = null; pf.sel = 0;
-  $('adminView').hidden = true; $('profileView').hidden = false;
+  showView('profile');
   $('pfWho').textContent = name || 'العضو'; $('pfTitleTx').textContent = 'ملف العضو';
   $('pfForm').hidden = true; $('pfBody').hidden = false;
   $('pfExit').textContent = 'رجوع للوحة الإدارة';
   window.scrollTo(0, 0);
   loadProfileData(curMonth());
 }
+// تفريغ كل بيانات صفحة "ملفي" من الذاكرة والشاشة (عند الخروج أو الانتقال لأي شاشة أخرى)
+function resetProfileState() {
+  pf.admin = false; pf.nid = pf.email = ''; pf.month = ''; pf.data = null; pf.sel = 0;
+  $('pfCal').innerHTML = ''; $('pfTiles').innerHTML = ''; $('pfList').innerHTML = ''; $('pfInfo').innerHTML = '';
+  $('pfDetail').hidden = true; $('pfInfo').hidden = true; $('pfListWrap').hidden = true;
+  $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfErr').hidden = true;
+  $('pfWho').textContent = 'سجل حضوري هذا الشهر'; $('pfTitleTx').textContent = 'ملفي'; $('pfExit').textContent = 'خروج';
+  ['pfNid', 'pfEmail'].forEach(id => $(id).value = '');
+}
 function leaveProfile() {
-  if (pf.admin) {
-    pf.admin = false; pf.nid = pf.email = ''; pf.data = null;
-    $('pfCal').innerHTML = ''; $('pfDetail').hidden = true; $('pfInfo').hidden = true; $('pfListWrap').hidden = true;
-    $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfWho').textContent = 'سجل حضوري هذا الشهر';
-    $('pfExit').textContent = 'خروج'; $('pfTitleTx').textContent = 'ملفي';
-    $('profileView').hidden = true; $('adminView').hidden = false; window.scrollTo(0, 0);
-    return;
-  }
-  pf.nid = pf.email = ''; pf.data = null;
-  $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfWho').textContent = 'سجل حضوري هذا الشهر';
-  $('pfCal').innerHTML = ''; $('pfDetail').hidden = true;
-  showProfileView(false);
+  if (pf.admin) { showView('admin'); return; }
+  showView('home');
 }
 
 async function loadProfileData(month) {
@@ -1171,8 +1185,13 @@ applyProfile();
 syncProfileUi();
 
 // زر الإدارة مخفي عن الأعضاء؛ يظهر فقط بالرابط الذي ينتهي بـ #admin
-try { if (location.hash === '#admin' || sessionStorage.getItem('att_admin_key')) document.body.classList.add('show-admin'); } catch (e) { if (location.hash === '#admin') document.body.classList.add('show-admin'); }
-window.addEventListener('hashchange', () => document.body.classList.toggle('show-admin', location.hash === '#admin' || !!getKey()));
+// أو على جهاز دخل منه الأدمن بنجاح من قبل (يُحفظ في هذا الجهاز فقط)
+const isAdminDevice = () => { try { return localStorage.getItem('att_admin_device') === '1'; } catch (e) { return false; } };
+const syncAdminBtn = () => document.body.classList.toggle('show-admin', SHOW_ADMIN_BUTTON || location.hash === '#admin' || !!getKey() || isAdminDevice());
+syncAdminBtn();
+window.addEventListener('hashchange', syncAdminBtn);
+
+showView('home');
 
 if (window.self !== window.top) $('frameBanner').hidden = false;
 
