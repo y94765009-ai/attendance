@@ -233,6 +233,24 @@ td a{color:var(--teal-deep);font-weight:600}
 .cal__day.is-late{background:linear-gradient(135deg,var(--bad-tint),#fff)}
 .pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
 .top__btns{display:flex;align-items:center;gap:8px;flex:none}
+body.is-admin #profileBtn{display:none}
+.who{background:none;border:0;padding:0;font-weight:700;color:var(--ink);text-align:start;text-decoration:underline dotted var(--gold);text-underline-offset:4px;cursor:pointer}
+.who:hover{color:var(--teal-deep);text-decoration-style:solid}
+.pf-info{margin:0 0 14px;background:var(--gold-tint);border:1px solid rgba(198,145,46,.35);border-radius:14px;padding:12px 14px;display:grid;gap:6px;font-size:14px}
+.pf-info .row{display:flex;justify-content:space-between;gap:10px}
+.pf-info dt{color:var(--ink-soft)} .pf-info dd{margin:0;font-weight:600;text-align:left;overflow-wrap:anywhere}
+.pf-list{margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pf-list table{font-size:13px}
+.pf-list th{position:static;padding:8px 10px;font-size:12.5px}
+.pf-list td{padding:8px 10px}
+.pf-list tbody tr:last-child td{border-bottom:0}
+.pf-list table{display:table;width:100%}
+.pf-list thead{display:table-header-group;position:static;width:auto;height:auto;overflow:visible;clip:auto}
+.pf-list tbody{display:table-row-group}
+.pf-list tr{display:table-row;padding:0;border:0}
+.pf-list th,.pf-list td{display:table-cell;text-align:start;white-space:nowrap}
+.pf-list td{border-bottom:1px solid var(--line);padding:8px 8px}
+.pf-list td::before{content:none}
 .icon-btn--accent{background:linear-gradient(135deg,#D9A544 0%,#C6912E 100%);color:#0B2442;border-color:rgba(232,197,122,.9);box-shadow:0 4px 12px rgba(0,0,0,.28)}
 .icon-btn--accent:hover{background:linear-gradient(135deg,#E3B459,#D09A35)}
 </style>
@@ -382,7 +400,7 @@ td a{color:var(--teal-deep);font-weight:600}
 <main class="shell" id="profileView" hidden>
   <div class="card">
     <div class="pf-head">
-      <div><h1 class="pf-title"><svg class="ic" style="vertical-align:-3px;margin-inline-end:6px"><use href="#i-user"/></svg>ملفي</h1><p class="pf-sub" id="pfWho">سجل حضوري هذا الشهر</p></div>
+      <div><h1 class="pf-title"><svg class="ic" style="vertical-align:-3px;margin-inline-end:6px"><use href="#i-user"/></svg><span id="pfTitleTx">ملفي</span></h1><p class="pf-sub" id="pfWho">سجل حضوري هذا الشهر</p></div>
       <button type="button" class="btn btn--quiet btn--small" id="pfBack"><svg class="ic"><use href="#i-back"/></svg>رجوع</button>
     </div>
 
@@ -401,6 +419,7 @@ td a{color:var(--teal-deep);font-weight:600}
     </form>
 
     <section id="pfBody" hidden>
+      <dl class="pf-info" id="pfInfo" hidden></dl>
       <div class="pf-month">
         <button type="button" class="pf-nav" id="pfPrev" aria-label="الشهر السابق">›</button>
         <strong id="pfMonthLabel"></strong>
@@ -415,6 +434,7 @@ td a{color:var(--teal-deep);font-weight:600}
       </div>
       <p class="hint" id="pfHint">اضغط على أي يوم ملوّن لعرض تفاصيله.</p>
       <div class="pf-detail" id="pfDetail" hidden></div>
+      <div class="pf-list" id="pfListWrap" hidden><table><thead><tr><th>اليوم</th><th>الحضور</th><th>الفرق</th><th>الانصراف</th><th>المدة</th></tr></thead><tbody id="pfList"></tbody></table></div>
       <button type="button" class="btn btn--quiet" id="pfExit" style="margin-top:14px">خروج</button>
     </section>
   </div>
@@ -890,7 +910,7 @@ function renderAdmin() {
       ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(row.latitude)},${encodeURIComponent(row.longitude)}" target="_blank" rel="noopener">الخريطة</a>` : '—';
     return `<tr>
       <td data-l="#">${toAr(i + 1)}</td>
-      <td data-l="الاسم"><strong>${esc(row.name)}</strong></td>
+      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(row.nationalId)}" data-name="${esc(row.name)}" title="عرض كل بيانات العضو">${esc(row.name)}</button></td>
       <td data-l="الرقم القومي"><span class="num">${esc(adm.showNid ? row.nationalId : maskNid(row.nationalId))}</span></td>
       <td data-l="البرنامج">${esc(row.program)}</td>
       <td data-l="النوع">${typeBadge}</td>
@@ -956,7 +976,7 @@ document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.addEventLis
 
 
 // ===================== ملفي =====================
-const pf = { nid: '', email: '', month: '', data: null, sel: 0 };
+const pf = { nid: '', email: '', month: '', data: null, sel: 0, admin: false };
 const WEEK = ['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'];
 const fmtHM = s => { const [h, m] = String(s).split(':').map(Number); const h12 = ((h + 11) % 12) + 1; return toAr(h12 + ':' + ('0' + m).slice(-2)) + (h >= 12 ? ' م' : ' ص'); };
 const numSpan = t => '<span class="num">' + esc(t) + '</span>';
@@ -979,7 +999,34 @@ function openProfile() {
   $('pfErr').hidden = true;
   showProfileView(true);
 }
+function renderInfo(d) {
+  const el = $('pfInfo');
+  if (!pf.admin || !d.member) { el.hidden = true; return; }
+  const m = d.member;
+  el.innerHTML = '<div class="row"><dt>الرقم القومي</dt><dd>' + numSpan(pf.nid) + '</dd></div>' +
+    '<div class="row"><dt>البرنامج</dt><dd>' + esc(m.program || '—') + '</dd></div>' +
+    '<div class="row"><dt>البريد المسجّل</dt><dd>' + numSpan(m.email || '—') + '</dd></div>' +
+    '<div class="row"><dt>الحالة</dt><dd>' + esc(m.status || 'نشط') + (m.inMembers ? '' : ' (غير مضاف في Members)') + '</dd></div>';
+  el.hidden = false;
+}
+function openMemberAsAdmin(nid, name) {
+  pf.admin = true; pf.nid = nid; pf.email = ''; pf.data = null; pf.sel = 0;
+  $('adminView').hidden = true; $('profileView').hidden = false;
+  $('pfWho').textContent = name || 'العضو'; $('pfTitleTx').textContent = 'ملف العضو';
+  $('pfForm').hidden = true; $('pfBody').hidden = false;
+  $('pfExit').textContent = 'رجوع للوحة الإدارة';
+  window.scrollTo(0, 0);
+  loadProfileData(curMonth());
+}
 function leaveProfile() {
+  if (pf.admin) {
+    pf.admin = false; pf.nid = pf.email = ''; pf.data = null;
+    $('pfCal').innerHTML = ''; $('pfDetail').hidden = true; $('pfInfo').hidden = true; $('pfListWrap').hidden = true;
+    $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfWho').textContent = 'سجل حضوري هذا الشهر';
+    $('pfExit').textContent = 'خروج'; $('pfTitleTx').textContent = 'ملفي';
+    $('profileView').hidden = true; $('adminView').hidden = false; window.scrollTo(0, 0);
+    return;
+  }
   pf.nid = pf.email = ''; pf.data = null;
   $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfWho').textContent = 'سجل حضوري هذا الشهر';
   $('pfCal').innerHTML = ''; $('pfDetail').hidden = true;
@@ -988,19 +1035,27 @@ function leaveProfile() {
 
 async function loadProfileData(month) {
   const err = $('pfErr'); err.hidden = true;
+  const hadData = !!pf.data;
   const fd = new URLSearchParams();
-  fd.append('action', 'profile'); fd.append('nationalId', pf.nid); fd.append('email', pf.email); fd.append('month', month);
+  fd.append('action', 'profile'); fd.append('nationalId', pf.nid); fd.append('month', month);
+  if (pf.admin) fd.append('key', getKey()); else fd.append('email', pf.email);
   $('pfGo').disabled = true; $('pfGoText').textContent = 'جارٍ التحميل…';
   ['pfPrev', 'pfNext'].forEach(id => $(id).disabled = true);
   try {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
-    if (data.result !== 'success') { pf.data = null; $('pfBody').hidden = true; $('pfForm').hidden = false; err.textContent = friendlyError(data); err.hidden = false; return; }
+    if (data.result !== 'success') {
+      if (pf.admin) { alert(data.code === 'UNAUTHORIZED' || data.code === 'PROFILE_AUTH' ? 'تعذّر التحقق من مفتاح الإدارة. أعيدي فتح لوحة الإدارة.' : friendlyError(data)); if (!hadData) leaveProfile(); return; }
+      pf.data = null;
+      $('pfBody').hidden = true; $('pfForm').hidden = false; err.textContent = friendlyError(data); err.hidden = false; return;
+    }
     pf.data = data; pf.month = data.month; pf.sel = 0;
     $('pfForm').hidden = true; $('pfBody').hidden = false;
     $('pfWho').textContent = data.name;
+    renderInfo(data);
     renderProfile();
   } catch (e) {
+    if (pf.admin) { alert('تعذّر الاتصال بالخادم.'); if (!hadData) leaveProfile(); return; }
     $('pfBody').hidden = true; $('pfForm').hidden = false;
     err.textContent = 'تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت والمحاولة مرة أخرى.'; err.hidden = false;
   } finally {
@@ -1039,6 +1094,11 @@ function renderProfile() {
   $('pfHint').hidden = !d.days.length && false;
   $('pfHint').textContent = d.days.length ? 'اضغط على أي يوم ملوّن لعرض تفاصيله.' : 'لا توجد تسجيلات حضور في هذا الشهر.';
   $('pfDetail').hidden = true;
+  $('pfListWrap').hidden = !d.days.length;
+  $('pfList').innerHTML = d.days.map(x => '<tr><td>' + toAr(x.day) + '</td><td>' + esc(fmtHM(x.in)) + '</td>' +
+    '<td class="' + (x.delta > 0 ? 'pf-pos' : x.delta < 0 ? 'pf-neg' : '') + '">' + numSpan(signed(x.delta)) + '</td>' +
+    '<td>' + (x.out ? esc(fmtHM(x.out)) : (x.auto ? 'تلقائي' : '—')) + '</td>' +
+    '<td>' + (x.minutes != null ? esc(toAr(Math.floor(x.minutes / 60)) + 'س ' + toAr(x.minutes % 60) + 'د') : '—') + '</td></tr>').join('');
   if (pf.sel) showDay(pf.sel);
 }
 
@@ -1077,6 +1137,7 @@ $('pfForm').addEventListener('submit', e => {
 });
 $('pfPrev').addEventListener('click', () => loadProfileData(shiftMonth(pf.month, -1)));
 $('pfNext').addEventListener('click', () => { if (pf.month < curMonth()) loadProfileData(shiftMonth(pf.month, 1)); });
+$('attendanceTableBody').addEventListener('click', e => { const b = e.target.closest('.who'); if (b) openMemberAsAdmin(b.dataset.nid, b.dataset.name); });
 $('pfCal').addEventListener('click', e => { const b = e.target.closest('.cal__day[data-day]'); if (b) showDay(+b.dataset.day); });
 
 $('clearProfileBtn').addEventListener('click', clearProfile);
