@@ -1190,6 +1190,8 @@ const isAdminDevice = () => { try { return localStorage.getItem('att_admin_devic
 const syncAdminBtn = () => document.body.classList.toggle('show-admin', SHOW_ADMIN_BUTTON || location.hash === '#admin' || !!getKey() || isAdminDevice());
 syncAdminBtn();
 window.addEventListener('hashchange', syncAdminBtn);
+// زر "إخفاء زر الإدارة من هذا الجهاز" له معنى فقط لو الزر مخفي افتراضيًا
+$('hideAdminBtn').hidden = SHOW_ADMIN_BUTTON;
 
 showView('home');
 
