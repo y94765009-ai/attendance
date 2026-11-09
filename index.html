@@ -223,7 +223,7 @@ td a{color:var(--teal-deep);font-weight:600}
 .pf-detail h3{margin:0 0 8px;font-size:16px}
 .pf-detail dl{margin:0;display:grid;gap:6px}
 .pf-detail .row{display:flex;justify-content:space-between;gap:10px;font-size:15px}
-.pf-detail dt{color:var(--ink-soft)} .pf-detail dd{margin:0;font-weight:600;text-align:left}
+.pf-detail dt{color:var(--ink-soft)} .pf-detail dd{margin:0;font-weight:600;text-align:end}
 .pf-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0;font-size:12.5px;color:var(--ink-soft)}
 .pf-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-1px;margin-inline-end:5px}
 
@@ -232,6 +232,9 @@ td a{color:var(--teal-deep);font-weight:600}
 .cal__day.is-early{background:linear-gradient(135deg,var(--ok-tint),#fff)}
 .cal__day.is-late{background:linear-gradient(135deg,var(--bad-tint),#fff)}
 .pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
+.lang-btn{width:auto;min-width:44px;padding:0 12px;font:600 13px/1 inherit;font-family:inherit;letter-spacing:.02em}
+html[dir=ltr] .seg__thumb{transform:translateX(calc(var(--i)*100%))}
+html[dir=ltr] body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .top__btns{display:flex;align-items:center;gap:8px;flex:none}
 body.is-admin #profileBtn{display:none}
 .icon-btn[aria-current="true"]{box-shadow:0 0 0 2px var(--gold-soft)}
@@ -245,7 +248,7 @@ body.show-admin #adminBtn{display:inline-flex}
 .who:hover{color:var(--teal-deep);text-decoration-style:solid}
 .pf-info{margin:0 0 14px;background:var(--gold-tint);border:1px solid rgba(198,145,46,.35);border-radius:14px;padding:12px 14px;display:grid;gap:6px;font-size:14px}
 .pf-info .row{display:flex;justify-content:space-between;gap:10px}
-.pf-info dt{color:var(--ink-soft)} .pf-info dd{margin:0;font-weight:600;text-align:left;overflow-wrap:anywhere}
+.pf-info dt{color:var(--ink-soft)} .pf-info dd{margin:0;font-weight:600;text-align:end;overflow-wrap:anywhere}
 .pf-list{margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .pf-list table{font-size:13px}
 .pf-list th{position:static;padding:8px 10px;font-size:12.5px}
@@ -290,6 +293,7 @@ body.show-admin #adminBtn{display:inline-flex}
       </div>
     </div>
     <div class="top__btns">
+      <button type="button" class="icon-btn lang-btn" id="langBtn" aria-label="Language / اللغة" title="Language / اللغة">EN</button>
       <button type="button" class="icon-btn icon-btn--accent" id="profileBtn" aria-label="ملفي" title="ملفي">
         <svg class="ic"><use href="#i-user"/></svg>
       </button>
@@ -524,13 +528,25 @@ const LOCATION_MAX_AGE_MS = 3 * 60 * 1000;
 
 // أوقات التسجيل بالدقائق من منتصف الليل (بتوقيت القاهرة) — للعرض فقط، والسيرفر هو الحكم
 const WINDOWS = {
-  'حضور':   { start: 8 * 60 + 30,  end: 10 * 60 + 30, startLabel: '٨:٣٠ صباحًا' },
-  'انصراف': { start: 15 * 60 + 30, end: 17 * 60 + 30, startLabel: '٣:٣٠ مساءً', endLabel: '٥:٣٠ مساءً' }
+  'حضور':   { start: 8 * 60 + 30,  end: 10 * 60 + 30, startAr: '٨:٣٠ صباحًا', startEn: '8:30 AM' },
+  'انصراف': { start: 15 * 60 + 30, end: 17 * 60 + 30, startAr: '٣:٣٠ مساءً', startEn: '3:30 PM' }
 };
 
 // true = زر الإدارة ظاهر للجميع (الحماية بمفتاح الإدارة على السيرفر). false = مخفي ويظهر فقط بالرابط #admin أو على جهاز الأدمن
 const SHOW_ADMIN_BUTTON = true;
 
+// بصمة الجهاز: رقم عشوائي يُحفظ في المتصفح، يُرسل مع التسجيل بصمت (لا يظهر للعضو)
+const DEVICE_KEY = 'att_device_v1';
+let memDeviceId = '';
+function getDeviceId() {
+  try { let d = localStorage.getItem(DEVICE_KEY); if (!d) { d = newId(); localStorage.setItem(DEVICE_KEY, d); } return d; }
+  catch (e) { return memDeviceId || (memDeviceId = newId()); }
+}
+function newId() { try { return crypto.randomUUID(); } catch (e) { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } }
+function deviceHint() {
+  const ua = navigator.userAgent || '', os = /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '?';
+  return os + ' ' + (screen.width || 0) + 'x' + (screen.height || 0);
+}
 const CONSENT_VERSION = '1.0';
 const CONSENT_KEY = 'att_consent_v';
 
@@ -544,7 +560,93 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const toAscii = s => String(s).replace(/[٠-٩]/g, d => AR_DIGITS.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-const toAr = n => String(n).replace(/\d/g, d => AR_DIGITS[d]);
+// ===================== اللغة (عربي / English) =====================
+const LANG_KEY = 'att_lang';
+let LANG = 'ar';
+try { const sv = localStorage.getItem(LANG_KEY); if (sv === 'en' || sv === 'ar') LANG = sv; } catch (e) {}
+const L = (ar, en) => LANG === 'en' ? en : ar;                         // نص حسب اللغة الحالية
+const toAr = n => LANG === 'en' ? String(n) : String(n).replace(/\d/g, d => AR_DIGITS[d]);   // الأرقام: هندية في العربي، لاتينية في الإنجليزي
+// وقت قادم من الشيت (أرقام عربية + ص/م) -> يُعرض لاتينيًا AM/PM في الإنجليزي
+const tm = v => { v = String(v == null ? '' : v); return LANG === 'en' ? toAscii(v).replace(/ص/g, 'AM').replace(/م/g, 'PM') : v; };
+// القيم الداخلية (المرسلة للشيت) تبقى عربية دائمًا؛ هذه للعرض فقط
+const PROG_EN = {
+  'البرنامج العام': 'General Program',
+  'برنامج تكنولوجيا الاشعة والتصوير الطبى': 'Medical Imaging & Radiologic Technology Program',
+  'برنامج تكنولوجيا المختبرات الطبية': 'Medical Laboratory Technology Program',
+  'برنامج تكنولوجيا الرعاية الطبية الحرجة والعاجلة': 'Critical & Emergency Care Technology Program',
+  'برنامج تكنولوجيا الاحصاء ونظم المعلومات الطبية': 'Statistics & Medical Information Systems Technology Program'
+};
+const progTxt = p => LANG === 'en' ? String(p == null ? '' : p).split(/\s*[،,]\s*/).map(x => PROG_EN[x.trim()] || x).join(', ') : String(p == null ? '' : p);
+const EN = {
+  'جامعة المنصورة الأهلية': 'Mansoura National University',
+  'كلية تكنولوجيا العلوم الصحية التطبيقية': 'Faculty of Applied Health Sciences Technology',
+  'ملفي': 'My profile', 'لوحة الإدارة': 'Admin panel', 'الوقت الحالي': 'Current time',
+  'جارٍ التحقق من الوقت': 'Checking time…',
+  'هذه الصفحة معروضة داخل موقع آخر، وقد يمنع المتصفح تحديد الموقع منها.': 'This page is shown inside another website, so the browser may block location access.',
+  'فتح في نافذة مستقلة': 'Open in a separate window',
+  'نوع التسجيل': 'Registration type', 'تسجيل حضور': 'Check in', 'تسجيل انصراف': 'Check out',
+  'بياناتك': 'Your details', 'الاسم الرباعي': 'Full name', 'الاسم كما في بطاقة الرقم القومي': 'Name as on your national ID',
+  'الرقم القومي': 'National ID', '14 رقمًا': '14 digits', 'البريد الإلكتروني': 'Email',
+  'يُرجى استخدام نفس البريد في الحضور والانصراف.': 'Please use the same email for check-in and check-out.',
+  'البرنامج (يُرجى اختيار برنامج واحد على الأقل)': 'Program (select at least one)',
+  'موقعك': 'Your location', 'تأكيد التسجيل': 'Confirm',
+  'تُحفظ بياناتك على هذا الجهاز فقط لتسهيل التسجيل القادم.': 'Your details are saved on this device only, to make the next registration easier.',
+  'مسح البيانات المحفوظة': 'Clear saved data',
+  'سحب الموافقة على استخدام الموقع': 'Withdraw location consent',
+  'التاريخ': 'Date', 'الوقت': 'Time', 'البُعد عن مركز الحرم': 'Distance from campus center', 'رجوع': 'Back',
+  'البريد الإلكتروني المستخدم في التسجيل': 'Email used for registration',
+  'لا يظهر هذا الملف لأي شخص آخر، ولا يُعرض إلا بعد مطابقة الرقم القومي والبريد.': 'This profile is private to you. It is shown only after your national ID and email are verified.',
+  'عرض ملفي': 'View my profile', 'الشهر السابق': 'Previous month', 'الشهر التالي': 'Next month', 'أيام الحضور': 'Attendance days',
+  'حضور قبل الموعد (+)': 'Early arrival (+)', 'حضور متأخر (−)': 'Late arrival (−)', 'في الموعد': 'On time',
+  'اليوم': 'Day', 'الحضور': 'Check-in', 'الفرق': 'Diff', 'الانصراف': 'Check-out', 'المدة': 'Duration', 'خروج': 'Exit',
+  'إخفاء زر الإدارة من هذا الجهاز': 'Hide admin button on this device', 'يخفي زر الإدارة من هذا الجهاز': 'Hides the admin button from this device',
+  'العودة للتسجيل': 'Back to registration',
+  'ابحث بالاسم أو البرنامج': 'Search by name or program', 'بحث في سجل اليوم': "Search today's log",
+  'إظهار الأرقام القومية': 'Show national IDs', 'للمراجعة': 'For review', 'تحديث': 'Refresh', 'سجل اليوم': "Today's log", 'الشيت كامل': 'Full sheet', 'الداشبورد': 'Dashboard',
+  'الاسم': 'Name', 'البرنامج': 'Program', 'البريد': 'Email', 'الموقع': 'Location', 'حالة الموقع': 'Location status',
+  'الموافقة على استخدام الموقع الجغرافي': 'Consent to use geolocation',
+  'أوافق على اطّلاع الكلية على موقعي الجغرافي وقت تسجيل الحضور أو الانصراف فقط، للتحقق من وجودي داخل الحرم الجامعي. تُحفظ الإحداثيات ومسافة البعد عن الحرم مع بيانات التسجيل، ولا يُتتبَّع موقعي في أي وقت آخر، ولا تُستخدم البيانات لغير أغراض الحضور والانصراف.':
+    'I agree that the college may see my location only at the time of check-in or check-out, to verify that I am on campus. The coordinates and my distance from the campus are saved with the registration data. My location is never tracked at any other time, and the data is used only for attendance purposes.',
+  'قرأت الإقرار وأوافق عليه': 'I have read the statement and agree',
+  'يلزم تحديد مربع الموافقة للمتابعة.': 'Please tick the consent box to continue.',
+  'موافق ومتابعة': 'Agree and continue', 'لا أوافق': 'I do not agree',
+  'دخول الإدارة': 'Admin sign-in', 'مفتاح الإدارة': 'Admin key', 'دخول': 'Sign in', 'إلغاء': 'Cancel',
+  'لم يُحدَّد الموقع بعد': 'Location not set yet',
+  'يُرجى الضغط على الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.': 'Please press the button below to confirm you are on campus.',
+  'تحديد موقعي الحالي': 'Get my current location',
+  'تم تسجيل الحضور': 'Check-in recorded',
+  'اضغط على أي يوم ملوّن لعرض تفاصيله.': 'Tap any coloured day to see its details.'
+};
+const collapseWs = t => t.replace(/\s+/g, ' ').trim();
+const AR_RE = /[\u0600-\u06FF]/;
+function tNode(node) {            // نص ثابت داخل الصفحة
+  if (node.__ar === undefined) { if (!AR_RE.test(node.data)) return; node.__ar = node.data; }
+  if (LANG === 'ar') { node.data = node.__ar; return; }
+  const key = collapseWs(node.__ar), en = EN[key];
+  if (en !== undefined) node.data = (/^\s/.test(node.__ar) ? ' ' : '') + en + (/\s$/.test(node.__ar) ? ' ' : '');
+}
+const I18N_ATTRS = ['placeholder', 'aria-label', 'title'];
+function translateStatic() {
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.parentNode && n.parentNode.closest && n.parentNode.closest('script,style')) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+  nodes.forEach(tNode);
+  document.querySelectorAll('[placeholder],[aria-label],[title]').forEach(el => I18N_ATTRS.forEach(a => {
+    if (!el.hasAttribute(a)) return;
+    const k = '__ar_' + a;
+    if (el[k] === undefined) { const v = el.getAttribute(a); if (!AR_RE.test(v)) return; el[k] = v; }
+    el.setAttribute(a, LANG === 'ar' ? el[k] : (EN[collapseWs(el[k])] || el[k]));
+  }));
+  document.querySelectorAll('input[name="prog_chk"]').forEach(cb => {
+    const sp = cb.closest('label').lastElementChild;
+    if (sp.__ar === undefined) sp.__ar = sp.textContent;
+    sp.textContent = LANG === 'ar' ? sp.__ar : (PROG_EN[cb.value] || sp.__ar);
+  });
+}
+function buildFmts() {
+  const loc = LANG === 'en' ? 'en-US' : 'ar-EG';
+  dateFmt = new Intl.DateTimeFormat(loc, { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  clockFmt = new Intl.DateTimeFormat(loc, { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+}
 
 // ===================== الوقت (بتوقيت القاهرة) =====================
 function cairoNow() {
@@ -553,8 +655,7 @@ function cairoNow() {
   return h * 60 + m;
 }
 function cairoDay(d) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d); }
-const dateFmt = new Intl.DateTimeFormat('ar-EG', { timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const clockFmt = new Intl.DateTimeFormat('ar-EG', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+let dateFmt, clockFmt; buildFmts();
 
 function tickClock() {
   const now = new Date();
@@ -572,19 +673,22 @@ function setPill(kind, text) {
   el.textContent = text;
 }
 
+// اسم العملية حسب اللغة (حضور/انصراف) — القيمة الداخلية تبقى عربية
+const nounOf = () => currentActionType === 'حضور' ? L('الحضور', 'Check-in') : L('الانصراف', 'Check-out');
 function checkTime() {
-  const m = cairoNow(), w = WINDOWS[currentActionType], noun = currentActionType === 'حضور' ? 'الحضور' : 'الانصراف';
+  const m = cairoNow(), w = WINDOWS[currentActionType], noun = nounOf();
+  const sl = LANG === 'en' ? w.startEn : w.startAr;
   let ok = false;
-  if (m < w.start) setPill('soon', 'تسجيل ' + noun + ' يبدأ ' + w.startLabel);
-  else if (m > w.end) setPill('closed', 'انتهى وقت تسجيل ' + noun + ' اليوم');
-  else { setPill('open', 'تسجيل ' + noun + ' متاح الآن'); ok = true; }
+  if (m < w.start) setPill('soon', L('تسجيل ' + noun + ' يبدأ ' + sl, noun + ' opens at ' + sl));
+  else if (m > w.end) setPill('closed', L('انتهى وقت تسجيل ' + noun + ' اليوم', noun + ' time has ended for today'));
+  else { setPill('open', L('تسجيل ' + noun + ' متاح الآن', noun + ' is open now')); ok = true; }
   // السماح بمحاولة الانصراف قبل الموعد بنصف ساعة (السيرفر هو الحكم، وهناك استثناءات لأعضاء بعينهم)
   if (!ok && currentActionType === 'انصراف' && m >= w.start - 30 && m <= w.end) ok = true;
   timeOk = ok;
 
   if (!locationReady && !submitting) {
     $('geoBtn').disabled = !ok;
-    if (!ok) setGeo('locked', 'التسجيل غير متاح الآن', m < w.start ? 'يبدأ تسجيل ' + noun + ' الساعة ' + w.startLabel + '.' : 'انتهى وقت تسجيل ' + noun + ' لهذا اليوم.');
+    if (!ok) { const early = m < w.start; setGeo('locked', () => L('التسجيل غير متاح الآن', 'Registration is not available now'), () => early ? L('يبدأ تسجيل ' + nounOf() + ' الساعة ' + w.startAr + '.', nounOf() + ' opens at ' + w.startEn + '.') : L('انتهى وقت تسجيل ' + nounOf() + ' لهذا اليوم.', nounOf() + ' time has ended for today.')); }
     else if ($('geoPanel').dataset.state === 'locked') resetLocationButton();
   }
   return ok;
@@ -599,9 +703,9 @@ const CHECK_SVG = '<svg class="ic"><use href="#i-check"/></svg>';
 
 function refreshSteps() {
   const s1 = validName() && validNid() && validEmail() && validProg();
-  [['step1', 'badge1', s1, '١'], ['step2', 'badge2', locationReady, '٢']].forEach(([st, bd, done, n]) => {
+  [['step1', 'badge1', s1, 1], ['step2', 'badge2', locationReady, 2]].forEach(([st, bd, done, n]) => {
     $(st).classList.toggle('is-done', done);
-    $(bd).innerHTML = done ? CHECK_SVG : n;
+    $(bd).innerHTML = done ? CHECK_SVG : toAr(n);
   });
 }
 
@@ -629,30 +733,34 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 const nearestDistance = (lat, lng) => Math.round(Math.min(...CAMPUS_POINTS.map(p => haversine(p.lat, p.lng, lat, lng))));
 
-function setGeo(state, title, sub) {
+let geoRe = null;
+const ev = v => typeof v === 'function' ? v() : v;
+function setGeo(state, title, sub) {          // title/sub: نص أو دالة (تُعاد عند تغيير اللغة)
+  geoRe = { state: state, title: title, sub: sub };
   $('geoPanel').dataset.state = state;
-  $('geoTitle').textContent = title;
-  $('geoStatus').textContent = sub;
+  $('geoTitle').textContent = ev(title);
+  $('geoStatus').textContent = ev(sub);
 }
 
 function setSubmitEnabled(on) {
   $('submitBtn').disabled = !on;
 }
 
+let geoBtnLabel = () => L('تحديد موقعي الحالي', 'Get my current location');
 function resetLocationButton() {
   locationReady = false;
   ['locationField', 'latitudeField', 'longitudeField', 'accuracyField'].forEach(id => $(id).value = '');
-  setGeo('idle', 'لم يُحدَّد الموقع بعد', 'يُرجى الضغط على الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.');
-  $('geoBtnText').textContent = 'تحديد موقعي الحالي';
+  setGeo('idle', () => L('لم يُحدَّد الموقع بعد', 'Location not set yet'), () => L('يُرجى الضغط على الزر أدناه للتأكد من وجودك داخل الحرم الجامعي.', 'Please press the button below to confirm you are on campus.'));
+  geoBtnLabel = () => L('تحديد موقعي الحالي', 'Get my current location'); $('geoBtnText').textContent = geoBtnLabel();
   $('geoBtn').disabled = !timeOk;
   setSubmitEnabled(false);
   refreshSteps();
 }
 
-function locationFailed(text) {
+function locationFailed(text) {          // text: دالة تعيد النص حسب اللغة
   locationReady = false;
-  setGeo('error', 'تعذّر تأكيد الموقع', text);
-  $('geoBtnText').textContent = 'إعادة تحديد الموقع';
+  setGeo('error', () => L('تعذّر تأكيد الموقع', 'Could not confirm location'), text);
+  geoBtnLabel = () => L('إعادة تحديد الموقع', 'Retry location'); $('geoBtnText').textContent = geoBtnLabel();
   $('geoBtn').disabled = false;
   setSubmitEnabled(false);
   refreshSteps();
@@ -661,20 +769,20 @@ function locationFailed(text) {
 function requestLocation() {
   if (!checkTime()) return;
   if (!hasConsent()) return showConsent();
-  if (!navigator.geolocation) return locationFailed('هذا المتصفح لا يدعم تحديد الموقع الجغرافي.');
+  if (!navigator.geolocation) return locationFailed(() => L('هذا المتصفح لا يدعم تحديد الموقع الجغرافي.', 'This browser does not support geolocation.'));
   $('geoBtn').disabled = true;
-  $('geoBtnText').textContent = 'جارٍ تحديد الموقع…';
-  setGeo('loading', 'جارٍ تحديد موقعك', 'يُرجى السماح للمتصفح بالوصول إلى الموقع عند ظهور الطلب.');
+  geoBtnLabel = () => L('جارٍ تحديد الموقع…', 'Locating…'); $('geoBtnText').textContent = geoBtnLabel();
+  setGeo('loading', () => L('جارٍ تحديد موقعك', 'Locating you'), () => L('يُرجى السماح للمتصفح بالوصول إلى الموقع عند ظهور الطلب.', 'Please allow the browser to access your location when prompted.'));
   navigator.geolocation.getCurrentPosition(onPosition, onPositionError, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 }
 
 function onPosition(pos) {
   const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
   if (acc > MAX_ACCURACY_M)
-    return locationFailed('دقة تحديد الموقع ضعيفة (' + toAr(Math.round(acc)) + ' م). يُرجى تفعيل GPS والمحاولة من مكان مفتوح.');
+    return locationFailed(() => L('دقة تحديد الموقع ضعيفة (' + toAr(Math.round(acc)) + ' م). يُرجى تفعيل GPS والمحاولة من مكان مفتوح.', 'Location accuracy is too low (' + Math.round(acc) + ' m). Please enable GPS and try again from an open area.'));
   const d = nearestDistance(lat, lng);
   if (d > RADIUS_M)
-    return locationFailed('موقعك خارج نطاق الحرم الجامعي، على بُعد حوالي ' + toAr(d) + ' م. يُرجى الاقتراب من الحرم الجامعي ثم إعادة المحاولة.');
+    return locationFailed(() => L('موقعك خارج نطاق الحرم الجامعي، على بُعد حوالي ' + toAr(d) + ' م. يُرجى الاقتراب من الحرم الجامعي ثم إعادة المحاولة.', 'You are outside the campus area, about ' + d + ' m away. Please move closer to campus and try again.'));
 
   $('locationField').value = 'جامعة المنصورة الأهلية - الدقهلية - مصر';
   $('latitudeField').value = lat;
@@ -682,8 +790,8 @@ function onPosition(pos) {
   $('accuracyField').value = Math.round(acc);
   locationReady = true;
   locationTime = Date.now();
-  setGeo('ok', 'أنت داخل الحرم الجامعي', 'على بُعد ' + toAr(d) + ' م من مركز الحرم.');
-  $('geoBtnText').textContent = 'إعادة تحديد الموقع';
+  setGeo('ok', () => L('أنت داخل الحرم الجامعي', 'You are on campus'), () => L('على بُعد ' + toAr(d) + ' م من مركز الحرم.', toAr(d) + ' m from the campus center.'));
+  geoBtnLabel = () => L('إعادة تحديد الموقع', 'Retry location'); $('geoBtnText').textContent = geoBtnLabel();
   $('geoBtn').disabled = false;
   setSubmitEnabled(true);
   refreshSteps();
@@ -691,16 +799,21 @@ function onPosition(pos) {
 
 function onPositionError(err) {
   const inFrame = window.self !== window.top;
-  let t = 'تعذّر تحديد الموقع. يُرجى المحاولة مرة أخرى.';
-  if (err.code === 1) {
-    t = 'رُفض إذن الموقع. يُرجى السماح للمتصفح بالوصول إلى الموقع من إعدادات الجهاز أو المتصفح، ثم إعادة المحاولة.';
-    if (inFrame) { t += ' قد يمنع الموقع المضيف تحديد الموقع داخل هذه الصفحة.'; $('frameBanner').hidden = false; }
-  } else if (err.code === 2) t = 'تعذّر الحصول على الموقع. يُرجى التأكد من تفعيل GPS والاتصال بالإنترنت.';
-  else if (err.code === 3) t = 'انتهت مهلة تحديد الموقع. يُرجى المحاولة من مكان مفتوح.';
-  locationFailed(t);
+  const c = err.code;
+  if (c === 1 && inFrame) $('frameBanner').hidden = false;
+  locationFailed(() => {
+    if (c === 1) return L('رُفض إذن الموقع. يُرجى السماح للمتصفح بالوصول إلى الموقع من إعدادات الجهاز أو المتصفح، ثم إعادة المحاولة.', 'Location permission was denied. Please allow the browser to access your location in your device or browser settings, then try again.')
+      + (inFrame ? L(' قد يمنع الموقع المضيف تحديد الموقع داخل هذه الصفحة.', ' The host site may block location access inside this page.') : '');
+    if (c === 2) return L('تعذّر الحصول على الموقع. يُرجى التأكد من تفعيل GPS والاتصال بالإنترنت.', 'Could not get your location. Please make sure GPS and internet are on.');
+    if (c === 3) return L('انتهت مهلة تحديد الموقع. يُرجى المحاولة من مكان مفتوح.', 'Locating timed out. Please try again from an open area.');
+    return L('تعذّر تحديد الموقع. يُرجى المحاولة مرة أخرى.', 'Could not determine your location. Please try again.');
+  });
 }
 
 // ===================== التبديل بين حضور/انصراف =====================
+const updateBtnText = () => { $('btnText').textContent = submitting ? L('جارٍ التسجيل…', 'Submitting…') : currentActionType === 'حضور' ? L('تسجيل الحضور', 'Check in') : L('تسجيل الانصراف', 'Check out'); };
+let alertRe = null, lastReceipt = null;
+function showAlert(thunk) { alertRe = thunk; const a = $('errorAlert'); if (!thunk) { a.hidden = true; return; } a.textContent = thunk(); a.hidden = false; }
 function switchActionType(type) {
   currentActionType = type;
   $('actionTypeField').value = type;
@@ -708,9 +821,9 @@ function switchActionType(type) {
   $('seg').style.setProperty('--i', att ? 0 : 1);
   $('tabAttendance').setAttribute('aria-selected', att);
   $('tabDeparture').setAttribute('aria-selected', !att);
-  $('btnText').textContent = att ? 'تسجيل الحضور' : 'تسجيل الانصراف';
+  updateBtnText();
   $('receipt').hidden = true; $('formCard').hidden = false;
-  $('errorAlert').hidden = true;
+  showAlert(null); lastReceipt = null;
   resetLocationButton();
   checkTime();
 }
@@ -718,37 +831,39 @@ function switchActionType(type) {
 // ===================== رسائل الأخطاء (محايدة للجنسين، مع الإجراء المطلوب) =====================
 function friendlyError(data) {
   const code = data && data.code, msg = (data && data.message) || '';
-  const noun = currentActionType === 'حضور' ? 'الحضور' : 'الانصراف';
+  const noun = nounOf(), en = LANG === 'en';
+  const nl = noun;
   const M = {
-    DUPLICATE: 'تم تسجيل ' + noun + ' اليوم بالفعل، ولا يمكن التسجيل أكثر من مرة في اليوم.',
-    NO_CHECKIN: 'لا يمكن تسجيل الانصراف قبل تسجيل الحضور اليوم. إذا تم تسجيل الحضور، يُرجى التواصل مع الإدارة.',
-    TOO_EARLY: 'لم يبدأ وقت تسجيل ' + noun + ' بعد. يُرجى المحاولة في الموعد المحدد.',
-    TOO_LATE: 'انتهى وقت تسجيل ' + noun + ' لهذا اليوم. للاستفسار يُرجى التواصل مع الإدارة.',
-    OUT_OF_RANGE: 'موقعك خارج نطاق الحرم الجامعي. يُرجى الاقتراب من الحرم ثم إعادة المحاولة.',
-    LOW_ACCURACY: 'دقة تحديد الموقع ضعيفة. يُرجى تفعيل GPS والمحاولة من مكان مفتوح.',
-    NO_LOCATION: 'يلزم السماح بالوصول إلى الموقع الجغرافي لإتمام التسجيل.',
-    NO_CONSENT: 'يلزم الموافقة على إقرار استخدام الموقع الجغرافي أولًا.',
-    BAD_EMAIL: 'البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.',
-    BAD_NID: 'الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.',
-    MISSING_NAME: 'يُرجى إدخال الاسم.',
-    NOT_MEMBER: 'الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.',
-    MEMBER_INACTIVE: 'هذا الحساب موقوف. يُرجى التواصل مع الإدارة.',
-    PROFILE_AUTH: 'البيانات غير مطابقة للمسجّل. يُرجى التأكد من الرقم القومي والبريد الإلكتروني المستخدم في التسجيل.',
-    TOO_MANY: 'محاولات كثيرة. يُرجى المحاولة بعد ١٠ دقائق.',
-    BUSY: 'النظام مشغول لحظيًا. يُرجى المحاولة مرة أخرى بعد قليل.',
-    SERVER: 'حدث خطأ غير متوقع. يُرجى المحاولة بعد قليل، وإن تكرر الأمر يُرجى التواصل مع الإدارة.'
+    DUPLICATE: L('تم تسجيل ' + noun + ' اليوم بالفعل، ولا يمكن التسجيل أكثر من مرة في اليوم.', nl + ' has already been recorded today. You cannot register more than once a day.'),
+    NO_CHECKIN: L('لا يمكن تسجيل الانصراف قبل تسجيل الحضور اليوم. إذا تم تسجيل الحضور، يُرجى التواصل مع الإدارة.', 'You cannot check out before checking in today. If you did check in, please contact the administration.'),
+    TOO_EARLY: L('لم يبدأ وقت تسجيل ' + noun + ' بعد. يُرجى المحاولة في الموعد المحدد.', nl + ' has not opened yet. Please try again at the scheduled time.'),
+    TOO_LATE: L('انتهى وقت تسجيل ' + noun + ' لهذا اليوم. للاستفسار يُرجى التواصل مع الإدارة.', nl + ' time has ended for today. For enquiries, please contact the administration.'),
+    OUT_OF_RANGE: L('موقعك خارج نطاق الحرم الجامعي. يُرجى الاقتراب من الحرم ثم إعادة المحاولة.', 'You are outside the campus area. Please move closer to campus and try again.'),
+    LOW_ACCURACY: L('دقة تحديد الموقع ضعيفة. يُرجى تفعيل GPS والمحاولة من مكان مفتوح.', 'Location accuracy is too low. Please enable GPS and try again from an open area.'),
+    NO_LOCATION: L('يلزم السماح بالوصول إلى الموقع الجغرافي لإتمام التسجيل.', 'Location access is required to complete registration.'),
+    NO_CONSENT: L('يلزم الموافقة على إقرار استخدام الموقع الجغرافي أولًا.', 'You must first agree to the location-use statement.'),
+    BAD_EMAIL: L('البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.', 'The email address is not valid. Please check it.'),
+    BAD_NID: L('الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.', 'The national ID must be 14 digits. Please check it.'),
+    MISSING_NAME: L('يُرجى إدخال الاسم.', 'Please enter your name.'),
+    NOT_MEMBER: L('الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.', 'This national ID is not registered among the college members. Please contact the administration.'),
+    MEMBER_INACTIVE: L('هذا الحساب موقوف. يُرجى التواصل مع الإدارة.', 'This account is suspended. Please contact the administration.'),
+    PROFILE_AUTH: L('البيانات غير مطابقة للمسجّل. يُرجى التأكد من الرقم القومي والبريد الإلكتروني المستخدم في التسجيل.', 'The details do not match our records. Please check the national ID and the email used for registration.'),
+    TOO_MANY: L('محاولات كثيرة. يُرجى المحاولة بعد ١٠ دقائق.', 'Too many attempts. Please try again in 10 minutes.'),
+    BUSY: L('النظام مشغول لحظيًا. يُرجى المحاولة مرة أخرى بعد قليل.', 'The system is momentarily busy. Please try again shortly.'),
+    SERVER: L('حدث خطأ غير متوقع. يُرجى المحاولة بعد قليل، وإن تكرر الأمر يُرجى التواصل مع الإدارة.', 'An unexpected error occurred. Please try again shortly, and contact the administration if it persists.')
   };
   if (code === 'EMAIL_MISMATCH') {
     const m = msg.match(/يبدأ بـ\s*(\S+?)\.\s/);
-    return 'هذا الرقم القومي مسجّل ببريد إلكتروني ' + (m ? 'يبدأ بـ ' + m[1] : 'مختلف') + '. يُرجى استخدام نفس البريد، أو التواصل مع الإدارة لتصحيحه.';
+    return L('هذا الرقم القومي مسجّل ببريد إلكتروني ' + (m ? 'يبدأ بـ ' + m[1] : 'مختلف') + '. يُرجى استخدام نفس البريد، أو التواصل مع الإدارة لتصحيحه.',
+             'This national ID is registered with ' + (m ? 'an email starting with ' + m[1] : 'a different email') + '. Please use the same email, or contact the administration to correct it.');
   }
   if (code === 'EMAIL_OTHER_NID') {
     const m = msg.match(/ينتهي بـ\s*(\d{4})/);
-    return 'هذا البريد الإلكتروني مسجّل برقم قومي آخر' + (m ? ' ينتهي بـ ' + toAr(m[1]) : '') + '. يُرجى مراجعة الرقم القومي المكتوب، أو التواصل مع الإدارة.';
+    return L('هذا البريد الإلكتروني مسجّل برقم قومي آخر' + (m ? ' ينتهي بـ ' + toAr(m[1]) : '') + '. يُرجى مراجعة الرقم القومي المكتوب، أو التواصل مع الإدارة.',
+             'This email is registered with a different national ID' + (m ? ' ending in ' + m[1] : '') + '. Please check the national ID you entered, or contact the administration.');
   }
-  return M[code] || msg || 'تعذّر إتمام التسجيل.';
+  return M[code] || (en ? '' : msg) || L('تعذّر إتمام التسجيل.', 'Registration could not be completed.');
 }
-
 // ===================== حفظ البيانات على الجهاز =====================
 const PROFILE_KEY = 'att_profile_v1';
 function loadProfile() {
@@ -785,16 +900,16 @@ async function submitForm(e) {
   let first = null;
   const bad = (errId, msg, inputId) => { setErr(errId, msg, inputId); first = first || $(inputId || errId); };
   setErr('err-name', '', 'memberName'); setErr('err-nid', '', 'nationalId'); setErr('err-email', '', 'memberEmail'); setErr('err-prog', '');
-  if (!name) bad('err-name', 'يُرجى إدخال الاسم الرباعي.', 'memberName');
-  if (!validNid()) bad('err-nid', 'الرقم القومي يتكون من ١٤ رقمًا بالضبط، ويُرجى التأكد من كتابته بدقة.', 'nationalId');
-  if (!validEmail()) bad('err-email', 'يُرجى إدخال بريد إلكتروني صحيح (مثال: name@example.com).', 'memberEmail');
-  if (!validProg()) { setErr('err-prog', 'يُرجى اختيار برنامج واحد على الأقل.'); first = first || document.querySelector('input[name="prog_chk"]'); }
+  if (!name) bad('err-name', L('يُرجى إدخال الاسم الرباعي.', 'Please enter your full name.'), 'memberName');
+  if (!validNid()) bad('err-nid', L('الرقم القومي يتكون من ١٤ رقمًا بالضبط، ويُرجى التأكد من كتابته بدقة.', 'The national ID must be exactly 14 digits. Please check it carefully.'), 'nationalId');
+  if (!validEmail()) bad('err-email', L('يُرجى إدخال بريد إلكتروني صحيح (مثال: name@example.com).', 'Please enter a valid email address (e.g. name@example.com).'), 'memberEmail');
+  if (!validProg()) { setErr('err-prog', L('يُرجى اختيار برنامج واحد على الأقل.', 'Please select at least one program.')); first = first || document.querySelector('input[name="prog_chk"]'); }
   if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
   if (!hasConsent()) return showConsent();
   if (!locationReady || Date.now() - locationTime > LOCATION_MAX_AGE_MS) {
     resetLocationButton();
-    setGeo('error', 'انتهت صلاحية تحديد الموقع', 'يُرجى تحديد الموقع مرة أخرى ثم إكمال التسجيل.');
+    setGeo('error', () => L('انتهت صلاحية تحديد الموقع', 'Location has expired'), () => L('يُرجى تحديد الموقع مرة أخرى ثم إكمال التسجيل.', 'Please get your location again, then complete registration.'));
     return;
   }
 
@@ -803,11 +918,12 @@ async function submitForm(e) {
   submitting = true;
   setSubmitEnabled(false);
   $('geoBtn').disabled = true;
-  $('btnText').textContent = 'جارٍ التسجيل…';
+  updateBtnText();
 
   const fd = new URLSearchParams();
   fd.append('name', name); fd.append('nationalId', nationalId); fd.append('email', email);
   fd.append('program', programs); fd.append('actionType', action); fd.append('consent', 'true');
+  fd.append('deviceId', getDeviceId()); fd.append('deviceHint', deviceHint());
   fd.append('dateStr', now.toLocaleDateString('ar-EG'));
   fd.append('timeStr', now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }));
   fd.append('location', $('locationField').value);
@@ -819,34 +935,29 @@ async function submitForm(e) {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
     if (data.result === 'success') { saveProfile(name, nationalId, email, Array.from(document.querySelectorAll('input[name="prog_chk"]:checked')).map(cb => cb.value)); showReceipt(action, name, now, data.distance); }
-    else { const a = $('errorAlert'); a.textContent = friendlyError(data); a.hidden = false; a.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    else { showAlert(() => friendlyError(data)); $('errorAlert').scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   } catch (err) {
-    const a = $('errorAlert');
-    a.textContent = 'تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت قبل إعادة المحاولة، وقد يكون التسجيل قد تم بالفعل — يمكن التأكد من الإدارة.';
-    a.hidden = false;
+    showAlert(() => L('تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت قبل إعادة المحاولة، وقد يكون التسجيل قد تم بالفعل — يمكن التأكد من الإدارة.', 'Could not reach the server. Please check your internet before retrying. The registration may already have gone through — you can confirm with the administration.'));
   } finally {
     submitting = false;
-    $('btnText').textContent = currentActionType === 'حضور' ? 'تسجيل الحضور' : 'تسجيل الانصراف';
+    updateBtnText();
     if (locationReady) setSubmitEnabled(true);
     $('geoBtn').disabled = false;
   }
 }
 
-function showReceipt(action, name, when, distance) {
-  $('rTitle').textContent = action === 'حضور' ? 'تم تسجيل الحضور' : 'تم تسجيل الانصراف';
+function showReceipt(action, name, when, distance) { lastReceipt = { action, name, when, distance }; renderReceipt(); $('formCard').hidden = true; $('receipt').hidden = false; $('receipt').scrollIntoView({ block: 'start', behavior: 'smooth' }); resetLocationButton(); }
+function renderReceipt() {
+  const { action, name, when, distance } = lastReceipt;
+  $('rTitle').textContent = action === 'حضور' ? L('تم تسجيل الحضور', 'Check-in recorded') : L('تم تسجيل الانصراف', 'Check-out recorded');
   $('rName').textContent = name;
   $('rDate').textContent = dateFmt.format(when);
-  $('rTime').textContent = new Intl.DateTimeFormat('ar-EG', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).format(when);
+  $('rTime').textContent = new Intl.DateTimeFormat(LANG === 'en' ? 'en-US' : 'ar-EG', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).format(when);
   const hasD = distance !== undefined && distance !== null && distance !== '';
   $('rDistRow').hidden = !hasD;
-  if (hasD) $('rDist').textContent = toAr(distance) + ' م';
-  $('rNote').textContent = (action === 'حضور' ? 'يبدأ تسجيل الانصراف الساعة ' + WINDOWS['انصراف'].startLabel + '. ' : '') + 'يمكن تصوير هذه الشاشة كإثبات للتسجيل.';
-  $('formCard').hidden = true;
-  $('receipt').hidden = false;
-  $('receipt').scrollIntoView({ block: 'start', behavior: 'smooth' });
-  resetLocationButton();
+  if (hasD) $('rDist').textContent = toAr(distance) + L(' م', ' m');
+  $('rNote').textContent = (action === 'حضور' ? L('يبدأ تسجيل الانصراف الساعة ' + WINDOWS['انصراف'].startAr + '. ', 'Check-out opens at ' + WINDOWS['انصراف'].startEn + '. ') : '') + L('يمكن تصوير هذه الشاشة كإثبات للتسجيل.', 'You can take a screenshot of this screen as proof of registration.');
 }
-
 // ===================== لوحة الإدارة =====================
 const adm = { all: [], showNid: false, query: '', onlyFlagged: false };
 const getKey = () => { try { return sessionStorage.getItem('att_admin_key') || ''; } catch (e) { return ''; } };
@@ -884,13 +995,13 @@ const maskNid = n => { n = String(n || ''); return n.length > 4 ? '••••�
 function fetchAdminData(key, firstOpen) {
   key = key || getKey();
   const tbody = $('attendanceTableBody');
-  if (!$('adminView').hidden) tbody.innerHTML = '<tr><td colspan="9" class="empty">جارٍ تحميل البيانات من الشيت…</td></tr>';
+  if (!$('adminView').hidden) tbody.innerHTML = '<tr><td colspan="9" class="empty">' + L('جارٍ تحميل البيانات من الشيت…', 'Loading data from the sheet…') + '</td></tr>';
   fetch(SCRIPT_URL + '?req=data&key=' + encodeURIComponent(key))
     .then(r => r.json())
     .then(data => {
       if (!Array.isArray(data)) {
         setKey('');
-        alert(data && data.code === 'UNAUTHORIZED' ? 'مفتاح الإدارة غير صحيح.' : 'تعذّر تحميل البيانات.');
+        alert(data && data.code === 'UNAUTHORIZED' ? L('مفتاح الإدارة غير صحيح.', 'The admin key is incorrect.') : L('تعذّر تحميل البيانات.', 'Could not load the data.'));
         return;
       }
       setKey(key);
@@ -903,8 +1014,8 @@ function fetchAdminData(key, firstOpen) {
       renderAdmin();
     })
     .catch(() => {
-      if ($('adminView').hidden) { alert('تعذّر الاتصال بالخادم.'); return; }
-      $('attendanceTableBody').innerHTML = '<tr><td colspan="9" class="empty">حدث خطأ أثناء جلب البيانات.</td></tr>';
+      if ($('adminView').hidden) { alert(L('تعذّر الاتصال بالخادم.', 'Could not reach the server.')); return; }
+      $('attendanceTableBody').innerHTML = '<tr><td colspan="9" class="empty">' + L('حدث خطأ أثناء جلب البيانات.', 'An error occurred while loading data.') + '</td></tr>';
     });
 }
 
@@ -933,42 +1044,43 @@ function renderAdmin() {
   const outCount = all.filter(g => g.outRow).length;
   const outside = all.filter(g => g.outside).length;
   $('stats').innerHTML =
-    `<div class="stat"><span class="stat__n">${toAr(all.length)}</span><span class="stat__l">أعضاء سجّلوا اليوم</span></div>` +
-    `<div class="stat"><span class="stat__n">${toAr(inCount)}</span><span class="stat__l">سجّلوا الحضور</span></div>` +
-    `<div class="stat"><span class="stat__n">${toAr(outCount)}</span><span class="stat__l">سجّلوا الانصراف</span></div>` +
-    `<div class="stat ${outside ? 'stat--warn' : ''}"><span class="stat__n">${toAr(outside)}</span><span class="stat__l">خارج النطاق</span></div>`;
+    `<div class="stat"><span class="stat__n">${toAr(all.length)}</span><span class="stat__l">${L('أعضاء سجّلوا اليوم', 'Members registered today')}</span></div>` +
+    `<div class="stat"><span class="stat__n">${toAr(inCount)}</span><span class="stat__l">${L('سجّلوا الحضور', 'Checked in')}</span></div>` +
+    `<div class="stat"><span class="stat__n">${toAr(outCount)}</span><span class="stat__l">${L('سجّلوا الانصراف', 'Checked out')}</span></div>` +
+    `<div class="stat ${outside ? 'stat--warn' : ''}"><span class="stat__n">${toAr(outside)}</span><span class="stat__l">${L('خارج النطاق', 'Outside range')}</span></div>`;
 
   const q = adm.query.trim().toLowerCase();
   const flaggedCount = all.filter(g => g.flags.length).length;
-  $('flagToggleText').textContent = 'للمراجعة' + (flaggedCount ? ' (' + toAr(flaggedCount) + ')' : '');
+  $('flagToggleText').textContent = L('للمراجعة', 'For review') + (flaggedCount ? ' (' + toAr(flaggedCount) + ')' : '');
   $('flagToggle').classList.toggle('is-on', adm.onlyFlagged);
   $('flagToggle').setAttribute('aria-pressed', String(adm.onlyFlagged));
   let list = q ? all.filter(g => (String(g.name) + ' ' + String(g.program)).toLowerCase().includes(q)) : all;
   if (adm.onlyFlagged) list = list.filter(g => g.flags.length);
   const tbody = $('attendanceTableBody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (adm.onlyFlagged ? 'لا يوجد أحد للمراجعة اليوم.' : all.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا توجد عمليات مسجّلة اليوم حتى الآن.') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">' + (adm.onlyFlagged ? L('لا يوجد أحد للمراجعة اليوم.', 'No one needs review today.') : all.length ? L('لا توجد نتائج مطابقة للبحث.', 'No results match your search.') : L('لا توجد عمليات مسجّلة اليوم حتى الآن.', 'No registrations recorded today yet.')) + '</td></tr>';
     return;
   }
   tbody.innerHTML = list.map((g, i) => {
-    const inTxt = g.inRow ? `<span class="badge badge--in">${esc(g.inRow.timeStr)}</span>` : '<span class="muted">لم يُسجَّل</span>';
+    const none = '<span class="muted">' + L('لم يُسجَّل', 'Not recorded') + '</span>';
+    const inTxt = g.inRow ? `<span class="badge badge--in">${esc(tm(g.inRow.timeStr))}</span>` : none;
     const outTxt = g.outRow
-      ? (g.outAuto ? `<span class="badge badge--out">تلقائي ${esc(g.outRow.timeStr)}</span>` : `<span class="badge badge--out">${esc(g.outRow.timeStr)}</span>`)
-      : '<span class="muted">لم يُسجَّل</span>';
-    const stBadge = `<span class="badge ${g.outside ? 'badge--bad' : 'badge--ok'}">${g.outside ? 'خارج النطاق' : 'داخل النطاق'}</span>`;
+      ? (g.outAuto ? `<span class="badge badge--out">${L('تلقائي', 'Auto')} ${esc(tm(g.outRow.timeStr))}</span>` : `<span class="badge badge--out">${esc(tm(g.outRow.timeStr))}</span>`)
+      : none;
+    const stBadge = `<span class="badge ${g.outside ? 'badge--bad' : 'badge--ok'}">${g.outside ? L('خارج النطاق', 'Outside range') : L('داخل النطاق', 'Inside range')}</span>`;
     const src = g.inRow || g.outRow;
     const loc = (src && src.latitude && src.longitude)
-      ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(src.latitude)},${encodeURIComponent(src.longitude)}" target="_blank" rel="noopener">الخريطة</a>` : '—';
+      ? `<a href="https://www.google.com/maps?q=${encodeURIComponent(src.latitude)},${encodeURIComponent(src.longitude)}" target="_blank" rel="noopener">${L('الخريطة', 'Map')}</a>` : '—';
     return `<tr>
       <td data-l="#">${toAr(i + 1)}</td>
-      <td data-l="الاسم"><button type="button" class="who" data-nid="${esc(g.id)}" data-name="${esc(g.name)}" title="عرض كل بيانات العضو">${esc(g.name)}</button>${g.flags.length ? ` <span class="flag" title="${esc(g.flags.join(' — '))}" tabindex="0" role="note">⚠ للمراجعة</span><div class="flag-txt">${esc(g.flags.join(' — '))}</div>` : ''}</td>
-      <td data-l="الرقم القومي"><span class="num">${esc(adm.showNid ? g.id : maskNid(g.id))}</span></td>
-      <td data-l="البرنامج">${esc(g.program)}</td>
-      <td data-l="الحضور">${inTxt}</td>
-      <td data-l="الانصراف">${outTxt}</td>
-      <td data-l="البريد"><span class="num">${esc(g.email)}</span></td>
-      <td data-l="الموقع">${loc}</td>
-      <td data-l="حالة الموقع">${stBadge}</td></tr>`;
+      <td data-l="${L('الاسم', 'Name')}"><button type="button" class="who" data-nid="${esc(g.id)}" data-name="${esc(g.name)}" title="${L('عرض كل بيانات العضو', 'View all member data')}">${esc(g.name)}</button>${g.flags.length ? ` <span class="flag" title="${esc(g.flags.join(' — '))}" tabindex="0" role="note">⚠ ${L('للمراجعة', 'Review')}</span><div class="flag-txt">${esc(g.flags.join(' — '))}</div>` : ''}</td>
+      <td data-l="${L('الرقم القومي', 'National ID')}"><span class="num">${esc(adm.showNid ? g.id : maskNid(g.id))}</span></td>
+      <td data-l="${L('البرنامج', 'Program')}">${esc(progTxt(g.program))}</td>
+      <td data-l="${L('الحضور', 'Check-in')}">${inTxt}</td>
+      <td data-l="${L('الانصراف', 'Check-out')}">${outTxt}</td>
+      <td data-l="${L('البريد', 'Email')}"><span class="num">${esc(g.email)}</span></td>
+      <td data-l="${L('الموقع', 'Location')}">${loc}</td>
+      <td data-l="${L('حالة الموقع', 'Location status')}">${stBadge}</td></tr>`;
   }).join('');
 }
 
@@ -978,19 +1090,19 @@ function csvCell(v, asText) {
 }
 function exportToCSV() {
   const g = groupMembers(adm.all);
-  if (!g.length) return alert('لا توجد بيانات لتحميلها.');
-  const lines = [['الاسم', 'الرقم القومي', 'البرنامج', 'وقت الحضور', 'وقت الانصراف', 'نوع الانصراف', 'البريد', 'حالة الموقع', 'ملاحظات الأمان'].map(h => csvCell(h)).join(',')];
-  g.forEach(m => lines.push([csvCell(m.name), csvCell(m.id, true), csvCell(m.program),
-    csvCell(m.inRow ? m.inRow.timeStr : ''), csvCell(m.outRow ? m.outRow.timeStr : ''),
-    csvCell(m.outRow ? (m.outAuto ? 'تلقائي' : 'يدوي') : ''), csvCell(m.email),
-    csvCell(m.outside ? 'خارج النطاق' : 'داخل النطاق'), csvCell(m.flags.join(' | '))].join(',')));
-  saveBlob(lines.join('\n'), 'سجل_الحضور_والانصراف_' + cairoDay(new Date()) + '.csv');
+  if (!g.length) return alert(L('لا توجد بيانات لتحميلها.', 'There is no data to download.'));
+  const lines = [L(['الاسم', 'الرقم القومي', 'البرنامج', 'وقت الحضور', 'وقت الانصراف', 'نوع الانصراف', 'البريد', 'حالة الموقع', 'ملاحظات الأمان'], ['Name', 'National ID', 'Program', 'Check-in time', 'Check-out time', 'Check-out type', 'Email', 'Location status', 'Security notes']).map(h => csvCell(h)).join(',')];
+  g.forEach(m => lines.push([csvCell(m.name), csvCell(m.id, true), csvCell(progTxt(m.program)),
+    csvCell(m.inRow ? tm(m.inRow.timeStr) : ''), csvCell(m.outRow ? tm(m.outRow.timeStr) : ''),
+    csvCell(m.outRow ? (m.outAuto ? L('تلقائي', 'Auto') : L('يدوي', 'Manual')) : ''), csvCell(m.email),
+    csvCell(m.outside ? L('خارج النطاق', 'Outside range') : L('داخل النطاق', 'Inside range')), csvCell(m.flags.join(' | '))].join(',')));
+  saveBlob(lines.join('\n'), L('سجل_الحضور_والانصراف_', 'attendance_log_') + cairoDay(new Date()) + '.csv');
 }
 function downloadFullSheet() {
   fetch(SCRIPT_URL + '?req=csv&key=' + encodeURIComponent(getKey()))
     .then(r => r.text())
-    .then(t => { if (t.trim().startsWith('{')) return alert('غير مصرّح أو حدث خطأ.'); saveBlob(t, 'الشيت_كامل_' + cairoDay(new Date()) + '.csv'); })
-    .catch(() => alert('تعذّر تحميل الشيت.'));
+    .then(t => { if (t.trim().startsWith('{')) return alert(L('غير مصرّح أو حدث خطأ.', 'Unauthorized or an error occurred.')); saveBlob(t, L('الشيت_كامل_', 'full_sheet_') + cairoDay(new Date()) + '.csv'); })
+    .catch(() => alert(L('تعذّر تحميل الشيت.', 'Could not download the sheet.')));
 }
 function saveBlob(text, filename) {
   const a = document.createElement('a');
@@ -1004,14 +1116,14 @@ $('tabDeparture').addEventListener('click', () => switchActionType('انصراف
 $('geoBtn').addEventListener('click', requestLocation);
 $('attendanceForm').addEventListener('submit', submitForm);
 $('newBtn').addEventListener('click', () => switchActionType(currentActionType));
-$('withdrawBtn').addEventListener('click', () => { storeConsent(false); resetLocationButton(); alert('تم سحب موافقتك. ستُطلب منك مرة أخرى عند التسجيل التالي.'); });
+$('withdrawBtn').addEventListener('click', () => { storeConsent(false); resetLocationButton(); alert(L('تم سحب موافقتك. ستُطلب منك مرة أخرى عند التسجيل التالي.', 'Your consent has been withdrawn. You will be asked again at your next registration.')); });
 $('openStandalone').addEventListener('click', () => window.open(location.href, '_blank', 'noopener'));
 
 $('consentYes').addEventListener('click', () => {
   if (!$('consentCheck').checked) { $('consentErr').hidden = false; return; }
   storeConsent(true); $('consentDialog').close(); requestLocation();
 });
-$('consentNo').addEventListener('click', () => { $('consentDialog').close(); setGeo('error', 'الموافقة مطلوبة', 'لا يمكن إتمام التسجيل دون الموافقة على استخدام الموقع الجغرافي.'); });
+$('consentNo').addEventListener('click', () => { $('consentDialog').close(); setGeo('error', () => L('الموافقة مطلوبة', 'Consent required'), () => L('لا يمكن إتمام التسجيل دون الموافقة على استخدام الموقع الجغرافي.', 'Registration cannot be completed without consenting to the use of your location.')); });
 
 $('adminBtn').addEventListener('click', openAdmin);
 $('closeAdminBtn').addEventListener('click', closeAdmin);
@@ -1020,7 +1132,8 @@ $('keyCancel').addEventListener('click', () => $('keyDialog').close());
 $('keyForm').addEventListener('submit', e => { e.preventDefault(); const k = $('keyInput').value.trim(); if (!k) return; $('keyDialog').close(); fetchAdminData(k, true); });
 $('refreshBtn').addEventListener('click', () => fetchAdminData());
 $('searchBox').addEventListener('input', e => { adm.query = e.target.value; renderAdmin(); });
-$('nidToggle').addEventListener('click', () => { adm.showNid = !adm.showNid; $('nidToggleText').textContent = adm.showNid ? 'إخفاء الأرقام القومية' : 'إظهار الأرقام القومية'; renderAdmin(); });
+const syncNidText = () => { $('nidToggleText').textContent = adm.showNid ? L('إخفاء الأرقام القومية', 'Hide national IDs') : L('إظهار الأرقام القومية', 'Show national IDs'); };
+$('nidToggle').addEventListener('click', () => { adm.showNid = !adm.showNid; syncNidText(); renderAdmin(); });
 $('csvTodayBtn').addEventListener('click', exportToCSV);
 $('flagToggle').addEventListener('click', () => { adm.onlyFlagged = !adm.onlyFlagged; renderAdmin(); });
 $('csvAllBtn').addEventListener('click', downloadFullSheet);
@@ -1033,15 +1146,16 @@ document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.addEventLis
 
 
 // ===================== ملفي =====================
-const pf = { nid: '', email: '', month: '', data: null, sel: 0, admin: false };
-const WEEK = ['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'];
-const fmtHM = s => { const [h, m] = String(s).split(':').map(Number); const h12 = ((h + 11) % 12) + 1; return toAr(h12 + ':' + ('0' + m).slice(-2)) + (h >= 12 ? ' م' : ' ص'); };
+const pf = { nid: '', email: '', month: '', data: null, sel: 0, admin: false, adminName: '', shownName: '' };
+let pfErrRe = null;
+const WEEK_AR = ['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'], WEEK_EN = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const fmtHM = s => { const [h, m] = String(s).split(':').map(Number); const h12 = ((h + 11) % 12) + 1; return toAr(h12 + ':' + ('0' + m).slice(-2)) + (LANG === 'en' ? (h >= 12 ? ' PM' : ' AM') : (h >= 12 ? ' م' : ' ص')); };
 const numSpan = t => '<span class="num">' + esc(t) + '</span>';
 const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + toAr(Math.abs(n));
-const hoursWord = h => h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : (h >= 3 && h <= 10) ? toAr(h) + ' ساعات' : toAr(h) + ' ساعة';
-const durTxt = min => { const h = Math.floor(min / 60), m = min % 60; return [h ? hoursWord(h) : '', (m || !h) ? toAr(m) + ' دقيقة' : ''].filter(Boolean).join(' و'); };
+const hoursWord = h => LANG === 'en' ? h + (h === 1 ? ' hour' : ' hours') : h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : (h >= 3 && h <= 10) ? toAr(h) + ' ساعات' : toAr(h) + ' ساعة';
+const durTxt = min => { const h = Math.floor(min / 60), m = min % 60; return [h ? hoursWord(h) : '', (m || !h) ? toAr(m) + L(' دقيقة', m === 1 ? ' minute' : ' minutes') : ''].filter(Boolean).join(L(' و', ' and ')); };
 const curMonth = () => cairoDay(new Date()).slice(0, 7);
-const monthLabel = ym => new Intl.DateTimeFormat('ar-EG', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)));
+const monthLabel = ym => new Intl.DateTimeFormat(LANG === 'en' ? 'en-US' : 'ar-EG', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)));
 const shiftMonth = (ym, d) => { const t = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + d, 1)); return t.getUTCFullYear() + '-' + ('0' + (t.getUTCMonth() + 1)).slice(-2); };
 
 function openProfile() {
@@ -1055,18 +1169,28 @@ function renderInfo(d) {
   const el = $('pfInfo');
   if (!pf.admin || !d.member) { el.hidden = true; return; }
   const m = d.member;
-  el.innerHTML = '<div class="row"><dt>الرقم القومي</dt><dd>' + numSpan(pf.nid) + '</dd></div>' +
-    '<div class="row"><dt>البرنامج</dt><dd>' + esc(m.program || '—') + '</dd></div>' +
-    '<div class="row"><dt>البريد المسجّل</dt><dd>' + numSpan(m.email || '—') + '</dd></div>' +
-    '<div class="row"><dt>الحالة</dt><dd>' + esc(m.status || 'نشط') + (m.inMembers ? '' : ' (غير مضاف في Members)') + '</dd></div>';
+  const st = m.status || 'نشط', stTxt = LANG === 'en' ? (st === 'نشط' ? 'Active' : st === 'موقوف' ? 'Suspended' : st) : st;
+  el.innerHTML = '<div class="row"><dt>' + L('الرقم القومي', 'National ID') + '</dt><dd>' + numSpan(pf.nid) + '</dd></div>' +
+    '<div class="row"><dt>' + L('البرنامج', 'Program') + '</dt><dd>' + esc(m.program ? progTxt(m.program) : '—') + '</dd></div>' +
+    '<div class="row"><dt>' + L('البريد المسجّل', 'Registered email') + '</dt><dd>' + numSpan(m.email || '—') + '</dd></div>' +
+    '<div class="row"><dt>' + L('الجهاز', 'Device') + '</dt><dd>' + (m.device === 'bound' ? esc(L('مربوط', 'Bound') + (m.deviceHint ? ' (' + m.deviceHint + ')' : '')) + ' <button type="button" class="btn btn--quiet btn--small" id="resetDevBtn">' + L('إعادة تعيين الجهاز', 'Reset device') + '</button>' : esc(L('غير مربوط بعد', 'Not bound yet'))) + '</dd></div>' +
+    '<div class="row"><dt>' + L('الحالة', 'Status') + '</dt><dd>' + esc(stTxt) + (m.inMembers ? '' : L(' (غير مضاف في Members)', ' (not in Members sheet)')) + '</dd></div>';
   el.hidden = false;
+}
+function syncPfLabels() {
+  if (pf.admin) {
+    $('pfWho').textContent = pf.shownName || pf.adminName || L('العضو', 'Member');
+    $('pfTitleTx').textContent = L('ملف العضو', 'Member profile'); $('pfExit').textContent = L('رجوع للوحة الإدارة', 'Back to admin panel');
+  } else {
+    $('pfWho').textContent = pf.shownName || L('سجل حضوري هذا الشهر', 'My attendance this month');
+    $('pfTitleTx').textContent = L('ملفي', 'My profile'); $('pfExit').textContent = L('خروج', 'Exit');
+  }
 }
 function openMemberAsAdmin(nid, name) {
   pf.admin = true; pf.nid = nid; pf.email = ''; pf.data = null; pf.sel = 0;
   showView('profile');
-  $('pfWho').textContent = name || 'العضو'; $('pfTitleTx').textContent = 'ملف العضو';
+  pf.adminName = name || ''; syncPfLabels();
   $('pfForm').hidden = true; $('pfBody').hidden = false;
-  $('pfExit').textContent = 'رجوع للوحة الإدارة';
   window.scrollTo(0, 0);
   loadProfileData(curMonth());
 }
@@ -1074,9 +1198,10 @@ function openMemberAsAdmin(nid, name) {
 function resetProfileState() {
   pf.admin = false; pf.nid = pf.email = ''; pf.month = ''; pf.data = null; pf.sel = 0;
   $('pfCal').innerHTML = ''; $('pfTiles').innerHTML = ''; $('pfList').innerHTML = ''; $('pfInfo').innerHTML = '';
+  pfErrRe = null;
   $('pfDetail').hidden = true; $('pfInfo').hidden = true; $('pfListWrap').hidden = true;
   $('pfBody').hidden = true; $('pfForm').hidden = false; $('pfErr').hidden = true;
-  $('pfWho').textContent = 'سجل حضوري هذا الشهر'; $('pfTitleTx').textContent = 'ملفي'; $('pfExit').textContent = 'خروج';
+  pf.adminName = ''; pf.shownName = ''; syncPfLabels();
   ['pfNid', 'pfEmail'].forEach(id => $(id).value = '');
 }
 function leaveProfile() {
@@ -1090,27 +1215,27 @@ async function loadProfileData(month) {
   const fd = new URLSearchParams();
   fd.append('action', 'profile'); fd.append('nationalId', pf.nid); fd.append('month', month);
   if (pf.admin) fd.append('key', getKey()); else fd.append('email', pf.email);
-  $('pfGo').disabled = true; $('pfGoText').textContent = 'جارٍ التحميل…';
+  $('pfGo').disabled = true; $('pfGoText').textContent = L('جارٍ التحميل…', 'Loading…');
   ['pfPrev', 'pfNext'].forEach(id => $(id).disabled = true);
   try {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
     if (data.result !== 'success') {
-      if (pf.admin) { alert(data.code === 'UNAUTHORIZED' || data.code === 'PROFILE_AUTH' ? 'تعذّر التحقق من مفتاح الإدارة. أعيدي فتح لوحة الإدارة.' : friendlyError(data)); if (!hadData) leaveProfile(); return; }
+      if (pf.admin) { alert(data.code === 'UNAUTHORIZED' || data.code === 'PROFILE_AUTH' ? L('تعذّر التحقق من مفتاح الإدارة. يُرجى إعادة فتح لوحة الإدارة.', 'Could not verify the admin key. Please reopen the admin panel.') : friendlyError(data)); if (!hadData) leaveProfile(); return; }
       pf.data = null;
-      $('pfBody').hidden = true; $('pfForm').hidden = false; err.textContent = friendlyError(data); err.hidden = false; return;
+      $('pfBody').hidden = true; $('pfForm').hidden = false; pfErrRe = () => friendlyError(data); err.textContent = pfErrRe(); err.hidden = false; return;
     }
     pf.data = data; pf.month = data.month; pf.sel = 0;
     $('pfForm').hidden = true; $('pfBody').hidden = false;
-    $('pfWho').textContent = data.name;
+    pf.shownName = data.name; syncPfLabels();
     renderInfo(data);
     renderProfile();
   } catch (e) {
-    if (pf.admin) { alert('تعذّر الاتصال بالخادم.'); if (!hadData) leaveProfile(); return; }
+    if (pf.admin) { alert(L('تعذّر الاتصال بالخادم.', 'Could not reach the server.')); if (!hadData) leaveProfile(); return; }
     $('pfBody').hidden = true; $('pfForm').hidden = false;
-    err.textContent = 'تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت والمحاولة مرة أخرى.'; err.hidden = false;
+    pfErrRe = () => L('تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت والمحاولة مرة أخرى.', 'Could not reach the server. Please check your internet and try again.'); err.textContent = pfErrRe(); err.hidden = false;
   } finally {
-    $('pfGo').disabled = false; $('pfGoText').textContent = 'عرض ملفي';
+    $('pfGo').disabled = false; $('pfGoText').textContent = L('عرض ملفي', 'View my profile');
     $('pfPrev').disabled = false; $('pfNext').disabled = !pf.month || pf.month >= curMonth();
   }
 }
@@ -1121,35 +1246,35 @@ function renderProfile() {
   $('pfNext').disabled = ym >= curMonth();
   const cls = n => n > 0 ? 'pf-pos' : n < 0 ? 'pf-neg' : '';
   $('pfTiles').innerHTML =
-    '<div class="pf-tile"><b>' + toAr(s.days) + '</b><span>أيام الحضور</span></div>' +
-    '<div class="pf-tile"><b class="' + cls(s.net) + '">' + numSpan(signed(s.net)) + ' <small>د</small></b><span>صافي الدقائق (+ تبكير / − تأخير)</span></div>' +
-    '<div class="pf-tile"><b class="' + cls(s.avg) + '">' + numSpan(signed(s.avg)) + ' <small>د</small></b><span>متوسط التبكير/التأخير يوميًا</span></div>' +
-    '<div class="pf-tile"><b>' + toAr(s.late) + '</b><span>أيام التأخير</span></div>';
+    '<div class="pf-tile"><b>' + toAr(s.days) + '</b><span>' + L('أيام الحضور', 'Attendance days') + '</span></div>' +
+    '<div class="pf-tile"><b class="' + cls(s.net) + '">' + numSpan(signed(s.net)) + ' <small>' + L('د', 'min') + '</small></b><span>' + L('صافي الدقائق (+ تبكير / − تأخير)', 'Net minutes (+ early / − late)') + '</span></div>' +
+    '<div class="pf-tile"><b class="' + cls(s.avg) + '">' + numSpan(signed(s.avg)) + ' <small>' + L('د', 'min') + '</small></b><span>' + L('متوسط التبكير/التأخير يوميًا', 'Average early/late per day') + '</span></div>' +
+    '<div class="pf-tile"><b>' + toAr(s.late) + '</b><span>' + L('أيام التأخير', 'Late days') + '</span></div>';
 
   const [Y, M] = ym.split('-').map(Number);
   const first = (new Date(Date.UTC(Y, M - 1, 1)).getUTCDay() + 1) % 7;   // السبت أول الأسبوع
   const dim = new Date(Date.UTC(Y, M, 0)).getUTCDate();
   const byDay = {}; d.days.forEach(x => byDay[x.day] = x);
   const today = cairoDay(new Date());
-  let h = WEEK.map(w => '<div class="cal__dow">' + w + '</div>').join('');
+  let h = (LANG === 'en' ? WEEK_EN : WEEK_AR).map(w => '<div class="cal__dow">' + w + '</div>').join('');
   for (let i = 0; i < first; i++) h += '<div></div>';
   for (let n = 1; n <= dim; n++) {
     const x = byDay[n];
     const isToday = today === ym + '-' + ('0' + n).slice(-2);
     if (!x) { h += '<button type="button" class="cal__day' + (isToday ? ' is-today' : '') + '" disabled>' + toAr(n) + '</button>'; continue; }
     const k = x.delta > 0 ? 'is-early' : x.delta < 0 ? 'is-late' : 'is-on';
-    h += '<button type="button" class="cal__day ' + k + (isToday ? ' is-today' : '') + (pf.sel === n ? ' is-sel' : '') + '" data-day="' + n + '" aria-label="يوم ' + toAr(n) + '">' +
+    h += '<button type="button" class="cal__day ' + k + (isToday ? ' is-today' : '') + (pf.sel === n ? ' is-sel' : '') + '" data-day="' + n + '" aria-label="' + L('يوم ', 'Day ') + toAr(n) + '">' +
          toAr(n) + '<small>' + numSpan(signed(x.delta)) + '</small></button>';
   }
   $('pfCal').innerHTML = h;
   $('pfHint').hidden = !d.days.length && false;
-  $('pfHint').textContent = d.days.length ? 'اضغط على أي يوم ملوّن لعرض تفاصيله.' : 'لا توجد تسجيلات حضور في هذا الشهر.';
+  $('pfHint').textContent = d.days.length ? L('اضغط على أي يوم ملوّن لعرض تفاصيله.', 'Tap any coloured day to see its details.') : L('لا توجد تسجيلات حضور في هذا الشهر.', 'There are no attendance records this month.');
   $('pfDetail').hidden = true;
   $('pfListWrap').hidden = !d.days.length;
   $('pfList').innerHTML = d.days.map(x => '<tr><td>' + toAr(x.day) + '</td><td>' + esc(fmtHM(x.in)) + '</td>' +
     '<td class="' + (x.delta > 0 ? 'pf-pos' : x.delta < 0 ? 'pf-neg' : '') + '">' + numSpan(signed(x.delta)) + '</td>' +
-    '<td>' + (x.out ? esc(fmtHM(x.out)) : (x.auto ? 'تلقائي' : '—')) + '</td>' +
-    '<td>' + (x.minutes != null ? esc(toAr(Math.floor(x.minutes / 60)) + 'س ' + toAr(x.minutes % 60) + 'د') : '—') + '</td></tr>').join('');
+    '<td>' + (x.out ? esc(fmtHM(x.out)) : (x.auto ? L('تلقائي', 'Auto') : '—')) + '</td>' +
+    '<td>' + (x.minutes != null ? esc(toAr(Math.floor(x.minutes / 60)) + L('س ', 'h ') + toAr(x.minutes % 60) + L('د', 'm')) : '—') + '</td></tr>').join('');
   if (pf.sel) showDay(pf.sel);
 }
 
@@ -1158,19 +1283,20 @@ function showDay(n) {
   pf.sel = n;
   document.querySelectorAll('#pfCal .cal__day').forEach(b => b.classList.toggle('is-sel', +b.dataset.day === n));
   const ws = pf.data.workStart, we = pf.data.workEnd;
-  const inTxt = x.delta > 0 ? 'قبل الموعد بـ ' + toAr(x.delta) + ' دقيقة' : x.delta < 0 ? 'متأخر ' + toAr(-x.delta) + ' دقيقة' : 'في الموعد تمامًا';
-  let rows = '<div class="row"><dt>الحضور</dt><dd>' + esc(fmtHM(x.in)) + '</dd></div>' +
-             '<div class="row"><dt>مقارنة بموعد ' + esc(fmtHM(ws)) + '</dt><dd class="' + (x.delta > 0 ? 'pf-pos' : x.delta < 0 ? 'pf-neg' : '') + '">' + esc(inTxt) + ' (' + numSpan(signed(x.delta)) + ')</dd></div>';
+  const inTxt = x.delta > 0 ? L('قبل الموعد بـ ' + toAr(x.delta) + ' دقيقة', toAr(x.delta) + ' min before schedule') : x.delta < 0 ? L('متأخر ' + toAr(-x.delta) + ' دقيقة', toAr(-x.delta) + ' min late') : L('في الموعد تمامًا', 'Right on time');
+  let rows = '<div class="row"><dt>' + L('الحضور', 'Check-in') + '</dt><dd>' + esc(fmtHM(x.in)) + '</dd></div>' +
+             '<div class="row"><dt>' + L('مقارنة بموعد ', 'Compared to ') + esc(fmtHM(ws)) + '</dt><dd class="' + (x.delta > 0 ? 'pf-pos' : x.delta < 0 ? 'pf-neg' : '') + '">' + esc(inTxt) + ' (' + numSpan(signed(x.delta)) + ')</dd></div>';
   if (x.out) {
-    const o = x.outDelta > 0 ? 'بعد الموعد بـ ' + toAr(x.outDelta) + ' دقيقة' : x.outDelta < 0 ? 'قبل الموعد بـ ' + toAr(-x.outDelta) + ' دقيقة' : 'في الموعد تمامًا';
-    rows += '<div class="row"><dt>الانصراف</dt><dd>' + esc(fmtHM(x.out)) + '</dd></div>' +
-            '<div class="row"><dt>مقارنة بموعد ' + esc(fmtHM(we)) + '</dt><dd>' + esc(o) + '</dd></div>' +
-            '<div class="row"><dt>مدة التواجد</dt><dd>' + esc(durTxt(x.minutes)) + '</dd></div>';
+    const o = x.outDelta > 0 ? L('بعد الموعد بـ ' + toAr(x.outDelta) + ' دقيقة', toAr(x.outDelta) + ' min after schedule') : x.outDelta < 0 ? L('قبل الموعد بـ ' + toAr(-x.outDelta) + ' دقيقة', toAr(-x.outDelta) + ' min before schedule') : L('في الموعد تمامًا', 'Right on time');
+    rows += '<div class="row"><dt>' + L('الانصراف', 'Check-out') + '</dt><dd>' + esc(fmtHM(x.out)) + '</dd></div>' +
+            '<div class="row"><dt>' + L('مقارنة بموعد ', 'Compared to ') + esc(fmtHM(we)) + '</dt><dd>' + esc(o) + '</dd></div>' +
+            '<div class="row"><dt>' + L('مدة التواجد', 'Time on site') + '</dt><dd>' + esc(durTxt(x.minutes)) + '</dd></div>';
   } else {
-    rows += '<div class="row"><dt>الانصراف</dt><dd>' + (x.auto ? 'تلقائي (لم يُسجَّل انصراف)' : 'لم يُسجَّل') + '</dd></div>';
+    rows += '<div class="row"><dt>' + L('الانصراف', 'Check-out') + '</dt><dd>' + (x.auto ? L('تلقائي (لم يُسجَّل انصراف)', 'Automatic (no check-out recorded)') : L('لم يُسجَّل', 'Not recorded')) + '</dd></div>';
   }
   const el = $('pfDetail');
-  el.innerHTML = '<h3>يوم ' + toAr(n) + ' ' + esc(monthLabel(pf.data.month).split(' ')[0]) + '</h3><dl>' + rows + '</dl>';
+  const mn = monthLabel(pf.data.month).split(' ')[0];
+  el.innerHTML = '<h3>' + esc(L('يوم ' + toAr(n) + ' ' + mn, mn + ' ' + n)) + '</h3><dl>' + rows + '</dl>';
   el.hidden = false;
 }
 
@@ -1181,14 +1307,25 @@ $('pfNid').addEventListener('input', e => { e.target.value = toAscii(e.target.va
 $('pfForm').addEventListener('submit', e => {
   e.preventDefault();
   const nid = $('pfNid').value.trim(), em = $('pfEmail').value.trim(), err = $('pfErr');
-  if (!/^\d{14}$/.test(nid)) { err.textContent = 'الرقم القومي يتكون من ١٤ رقمًا بالضبط.'; err.hidden = false; return; }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { err.textContent = 'يُرجى إدخال بريد إلكتروني صحيح.'; err.hidden = false; return; }
-  pf.nid = nid; pf.email = em;
+  if (!/^\d{14}$/.test(nid)) { pfErrRe = () => L('الرقم القومي يتكون من ١٤ رقمًا بالضبط.', 'The national ID must be exactly 14 digits.'); err.textContent = pfErrRe(); err.hidden = false; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { pfErrRe = () => L('يُرجى إدخال بريد إلكتروني صحيح.', 'Please enter a valid email address.'); err.textContent = pfErrRe(); err.hidden = false; return; }
+  pf.nid = nid; pf.email = em; pfErrRe = null;
   loadProfileData(curMonth());
 });
 $('pfPrev').addEventListener('click', () => loadProfileData(shiftMonth(pf.month, -1)));
 $('pfNext').addEventListener('click', () => { if (pf.month < curMonth()) loadProfileData(shiftMonth(pf.month, 1)); });
 $('attendanceTableBody').addEventListener('click', e => { const b = e.target.closest('.who'); if (b) openMemberAsAdmin(b.dataset.nid, b.dataset.name); });
+$('pfInfo').addEventListener('click', async e => {
+  if (!e.target.closest('#resetDevBtn') || !pf.admin) return;
+  if (!confirm(L('سيتم فك ربط جهاز هذا العضو، وسيُربط تلقائيًا بأول جهاز يسجّل منه. هل تريدين المتابعة؟', 'This will unbind this member\'s device. The next device they register from will be bound automatically. Continue?'))) return;
+  const btn = e.target.closest('#resetDevBtn'); btn.disabled = true;
+  try {
+    const fd = new URLSearchParams(); fd.append('action', 'resetDevice'); fd.append('nationalId', pf.nid); fd.append('key', getKey());
+    const data = await (await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd })).json();
+    if (data.result !== 'success') throw 0;
+    loadProfileData(pf.month || curMonth());
+  } catch (err) { btn.disabled = false; alert(L('تعذّرت إعادة التعيين.', 'Could not reset the device.')); }
+});
 $('pfCal').addEventListener('click', e => { const b = e.target.closest('.cal__day[data-day]'); if (b) showDay(+b.dataset.day); });
 
 $('clearProfileBtn').addEventListener('click', clearProfile);
@@ -1204,7 +1341,37 @@ window.addEventListener('hashchange', syncAdminBtn);
 // زر "إخفاء زر الإدارة من هذا الجهاز" له معنى فقط لو الزر مخفي افتراضيًا
 $('hideAdminBtn').hidden = SHOW_ADMIN_BUTTON;
 
+// ===================== تطبيق اللغة =====================
+function applyLang(persist) {
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'en' ? 'ltr' : 'rtl';
+  document.title = L('تسجيل الحضور والانصراف | كلية تكنولوجيا العلوم الصحية التطبيقية', 'Attendance & Departure | Faculty of Applied Health Sciences Technology');
+  $('langBtn').textContent = LANG === 'en' ? 'عربي' : 'EN';
+  $('langBtn').setAttribute('lang', LANG === 'en' ? 'ar' : 'en');
+  if (persist) { try { localStorage.setItem(LANG_KEY, LANG); } catch (e) {} }
+  buildFmts();
+  translateStatic();
+  // المحتوى الديناميكي
+  $('pfPrev').textContent = LANG === 'en' ? '‹' : '›'; $('pfNext').textContent = LANG === 'en' ? '›' : '‹';
+  updateBtnText(); checkTime(); tickClock();
+  if (geoRe) setGeo(geoRe.state, geoRe.title, geoRe.sub);
+  $('geoBtnText').textContent = geoBtnLabel();
+  if (alertRe) showAlert(alertRe);
+  if (lastReceipt) renderReceipt();
+  ['err-name', 'err-nid', 'err-email', 'err-prog'].forEach(id => { $(id).hidden = true; $(id).textContent = ''; });
+  ['memberName', 'nationalId', 'memberEmail'].forEach(id => $(id).removeAttribute('aria-invalid'));
+  $('badge3').textContent = toAr(3);
+  refreshSteps();
+  syncPfLabels(); syncNidText();
+  if (pfErrRe && !$('pfErr').hidden) $('pfErr').textContent = pfErrRe();
+  if (!$('pfGo').disabled) $('pfGoText').textContent = L('عرض ملفي', 'View my profile');
+  if (pf.data) { renderInfo(pf.data); renderProfile(); }
+  if (adm.all.length || !$('adminView').hidden) { renderAdmin(); $('admDate').textContent = dateFmt.format(new Date()); }
+}
+$('langBtn').addEventListener('click', () => { LANG = LANG === 'en' ? 'ar' : 'en'; applyLang(true); });
+
 showView('home');
+applyLang(false);
 
 if (window.self !== window.top) $('frameBanner').hidden = false;
 
