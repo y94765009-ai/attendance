@@ -232,11 +232,11 @@ td a{color:var(--teal-deep);font-weight:600}
 .cal__day.is-early{background:linear-gradient(135deg,var(--ok-tint),#fff)}
 .cal__day.is-late{background:linear-gradient(135deg,var(--bad-tint),#fff)}
 .pf-detail{background:linear-gradient(135deg,var(--teal-tint),#fff);border:1px solid var(--line)}
-.lang-btn{width:auto;min-width:44px;padding:0 12px;font:600 13px/1 inherit;font-family:inherit;letter-spacing:.02em}
 html[dir=ltr] .seg__thumb{transform:translateX(calc(var(--i)*100%))}
 html[dir=ltr] body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .top__btns{display:flex;align-items:center;gap:8px;flex:none}
-@media(max-width:560px){.top__in{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;padding:12px 16px}.brand{display:contents}.brand__mark{grid-row:1;grid-column:1}.top__btns{grid-row:1;grid-column:2;justify-self:end}.brand>div{grid-row:2;grid-column:1/-1}.brand__name{font-size:17px}.brand__sub{font-size:13px}}
+.lang-btn{width:34px;height:34px;border-radius:10px;font:700 12px/1 inherit;font-family:inherit;padding:0}
+@media(max-width:430px){.top__in{padding:12px 12px;gap:8px}.brand{gap:9px}.brand__mark{width:44px;height:44px}.brand__name{font-size:15px}.brand__sub{font-size:12px}.top__btns{gap:6px}.top__btns .icon-btn{width:38px;height:38px}.lang-btn{width:32px!important;height:32px!important}}
 body.is-admin #profileBtn{display:none}
 .icon-btn[aria-current="true"]{box-shadow:0 0 0 2px var(--gold-soft)}
 #adminBtn{display:none}
@@ -564,7 +564,7 @@ const toAscii = s => String(s).replace(/[٠-٩]/g, d => AR_DIGITS.indexOf(d)).re
 // ===================== اللغة (عربي / English) =====================
 const LANG_KEY = 'att_lang';
 let LANG = 'ar';
-try { const sv = localStorage.getItem(LANG_KEY); if (sv === 'en' || sv === 'ar') LANG = sv; } catch (e) {}
+try { const sv = localStorage.getItem(LANG_KEY); if (sv === 'en' || sv === 'ar') LANG = sv; if (/[?&]lang=en\b/.test(location.search)) LANG = 'en'; } catch (e) {}
 const L = (ar, en) => LANG === 'en' ? en : ar;                         // نص حسب اللغة الحالية
 const toAr = n => LANG === 'en' ? String(n) : String(n).replace(/\d/g, d => AR_DIGITS[d]);   // الأرقام: هندية في العربي، لاتينية في الإنجليزي
 // وقت قادم من الشيت (أرقام عربية + ص/م) -> يُعرض لاتينيًا AM/PM في الإنجليزي
@@ -1346,10 +1346,10 @@ $('hideAdminBtn').hidden = SHOW_ADMIN_BUTTON;
 function applyLang(persist) {
   document.documentElement.lang = LANG;
   document.documentElement.dir = LANG === 'en' ? 'ltr' : 'rtl';
-  document.title = L('تسجيل الحضور والانصراف | كلية تكنولوجيا العلوم الصحية التطبيقية', 'Attendance & Departure | Faculty of Applied Health Sciences Technology');
-  $('langBtn').textContent = LANG === 'en' ? 'عربي' : 'EN';
+  $('langBtn').textContent = LANG === 'en' ? 'ع' : 'EN';
   $('langBtn').setAttribute('lang', LANG === 'en' ? 'ar' : 'en');
   if (persist) { try { localStorage.setItem(LANG_KEY, LANG); } catch (e) {} }
+  document.title = L('تسجيل الحضور والانصراف | كلية تكنولوجيا العلوم الصحية التطبيقية', 'Attendance & Departure | Faculty of Applied Health Sciences Technology');
   buildFmts();
   translateStatic();
   // المحتوى الديناميكي
@@ -1369,6 +1369,7 @@ function applyLang(persist) {
   if (pf.data) { renderInfo(pf.data); renderProfile(); }
   if (adm.all.length || !$('adminView').hidden) { renderAdmin(); $('admDate').textContent = dateFmt.format(new Date()); }
 }
+
 $('langBtn').addEventListener('click', () => { LANG = LANG === 'en' ? 'ar' : 'en'; applyLang(true); });
 
 showView('home');
