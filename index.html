@@ -523,7 +523,7 @@ const CAMPUS_POINTS = [
   { lat: 31.4486027, lng: 31.4791828 },
   { lat: 31.4496051, lng: 31.4824477 }
 ];
-const RADIUS_M = 500;
+const RADIUS_M = 300;
 const MAX_ACCURACY_M = 150;
 const LOCATION_MAX_AGE_MS = 3 * 60 * 1000;
 
@@ -844,6 +844,7 @@ function friendlyError(data) {
     NO_LOCATION: L('يلزم السماح بالوصول إلى الموقع الجغرافي لإتمام التسجيل.', 'Location access is required to complete registration.'),
     NO_CONSENT: L('يلزم الموافقة على إقرار استخدام الموقع الجغرافي أولًا.', 'You must first agree to the location-use statement.'),
     BAD_EMAIL: L('البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.', 'The email address is not valid. Please check it.'),
+    DEVICE_TAKEN: L('تعذّر إتمام التسجيل من هذا الجهاز. يُرجى التسجيل من جهازك الشخصي، أو التواصل مع الإدارة.', 'Registration could not be completed from this device. Please register from your own device, or contact the administration.'),
     BAD_NID: L('الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.', 'The national ID must be 14 digits. Please check it.'),
     MISSING_NAME: L('يُرجى إدخال الاسم.', 'Please enter your name.'),
     NOT_MEMBER: L('الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.', 'This national ID is not registered among the college members. Please contact the administration.'),
