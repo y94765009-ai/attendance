@@ -155,6 +155,26 @@ dialog::backdrop{background:rgba(11,36,66,.6)}
 .adm-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
 .adm-title{margin:0;font-size:22px;font-weight:700}
 .adm-sub{margin:0;color:var(--ink-soft);font-size:14px}
+.adm-day{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px;color:var(--ink-soft)}
+.adm-day .input{width:auto;min-width:0;padding:6px 10px;min-height:0}
+.msearch{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px}
+.msearch__t{margin:0 0 10px;font-size:17px;color:var(--ink)}
+.msearch__row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.msearch__row>.input{flex:1 1 240px;min-width:0}
+.msearch__day{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--ink-soft)}
+.msearch__day .input{width:auto;min-width:0;min-height:44px}
+.msearch__res{margin-top:12px;display:grid;gap:12px}
+.mm{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.mm__h{padding:10px 14px;background:var(--gold-tint);font-weight:700;color:var(--ink)}
+.mm__h small{display:block;font-weight:400;color:var(--ink-soft);margin-top:2px;font-size:13px;overflow-wrap:anywhere}
+.mm__v{padding:10px 14px;font-weight:700}
+.mm__v--yes{background:var(--ok-tint);color:var(--ok)}
+.mm__v--no{background:var(--bad-tint);color:var(--bad)}
+.mm table{width:100%;border-collapse:collapse}
+.mm th,.mm td{padding:8px 12px;text-align:start;border-top:1px solid var(--line);font-size:14px}
+.mm th{background:#F7F9FC;color:var(--ink-soft);font-weight:600}
+.mm__none{color:var(--ink-soft);padding:10px 14px}
+.mm__wrap{overflow-x:auto}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .stat{background:var(--surface);border-radius:14px;padding:14px 16px;border:1px solid var(--line)}
 .stat__n{display:block;font-size:30px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
@@ -457,10 +477,20 @@ body.show-admin #adminBtn{display:inline-flex}
     <div>
       <h1 class="adm-title">لوحة الإدارة</h1>
       <p class="adm-sub" id="admDate"></p>
+      <div class="adm-day"><label for="admDay" id="admDayLbl">اختيار اليوم</label><input type="date" class="input" id="admDay"></div>
     </div>
     <button type="button" class="btn btn--quiet btn--small" id="hideAdminBtn" title="يخفي زر الإدارة من هذا الجهاز">إخفاء زر الإدارة من هذا الجهاز</button>
     <button type="button" class="btn btn--quiet btn--small" id="closeAdminBtn"><svg class="ic"><use href="#i-back"/></svg>العودة للتسجيل</button>
   </div>
+  <section class="msearch" id="memBox">
+    <h2 class="msearch__t" id="memTitle">🔎 بحث عن عضو بكل التواريخ</h2>
+    <div class="msearch__row">
+      <input class="input" type="search" id="memQ" placeholder="الاسم (عربي أو English) أو الرقم القومي" autocomplete="off">
+      <label class="msearch__day"><span id="memDayLbl">في تاريخ</span><input type="date" class="input" id="memDay"></label>
+      <button type="button" class="btn btn--quiet btn--small" id="memClear">مسح</button>
+    </div>
+    <div id="memRes" class="msearch__res"></div>
+  </section>
   <div class="stats" id="stats"></div>
   <div class="tools">
     <div class="search">
@@ -961,7 +991,23 @@ function renderReceipt() {
   $('rNote').textContent = (action === 'حضور' ? L('يبدأ تسجيل الانصراف الساعة ' + WINDOWS['انصراف'].startAr + '. ', 'Check-out opens at ' + WINDOWS['انصراف'].startEn + '. ') : '') + L('يمكن تصوير هذه الشاشة كإثبات للتسجيل.', 'You can take a screenshot of this screen as proof of registration.');
 }
 // ===================== لوحة الإدارة =====================
-const adm = { all: [], showNid: false, query: '', onlyFlagged: false };
+const adm = { all: [], raw: [], day: '', showNid: false, query: '', onlyFlagged: false };
+function admRowDay(r) {
+  if (r.timestamp) return cairoDay(new Date(r.timestamp));
+  const t = String(r.dateStr || '').replace(/[\u0660-\u0669]/g, d => d.charCodeAt(0) - 0x0660).replace(/[\u06F0-\u06F9]/g, d => d.charCodeAt(0) - 0x06F0);
+  const m = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/) || null;
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  const m2 = t.match(/(\d{1,2})\D+(\d{1,2})\D+(\d{4})/);
+  return m2 ? m2[3] + '-' + ('0' + m2[2]).slice(-2) + '-' + ('0' + m2[1]).slice(-2) : '';
+}
+function admApplyDay() {
+  const today = cairoDay(new Date());
+  if (!adm.day) adm.day = today;
+  adm.all = adm.raw.filter(r => admRowDay(r) === adm.day);
+  $('admDay').value = adm.day; $('admDay').max = today;
+  $('admDayLbl').textContent = L('اختيار اليوم', 'Select day');
+  $('admDate').textContent = dateFmt.format(new Date(adm.day + 'T12:00:00Z'));
+}
 const getKey = () => { try { return sessionStorage.getItem('att_admin_key') || ''; } catch (e) { return ''; } };
 const setKey = k => { try { k ? sessionStorage.setItem('att_admin_key', k) : sessionStorage.removeItem('att_admin_key'); } catch (e) {} };
 
@@ -987,7 +1033,7 @@ function openAdmin() {
 }
 function closeAdmin() {
   setKey('');
-  adm.all = []; adm.query = ''; adm.showNid = false; adm.onlyFlagged = false;        // بيانات الأعضاء تُمسح عند الخروج من الإدارة
+  adm.all = []; adm.raw = []; adm.day = ''; adm.query = ''; $('memQ').value = ''; $('memDay').value = ''; $('memRes').innerHTML = ''; adm.showNid = false; adm.onlyFlagged = false;        // بيانات الأعضاء تُمسح عند الخروج من الإدارة
   $('attendanceTableBody').innerHTML = ''; $('stats').innerHTML = ''; $('searchBox').value = '';
   showView('home');
 }
@@ -1010,9 +1056,9 @@ function fetchAdminData(key, firstOpen) {
       try { localStorage.setItem('att_admin_device', '1'); } catch (e) {}
       showView('admin');
       if (DASHBOARD_URL) $('dashBtn').hidden = false;
-      const today = cairoDay(new Date()), legacy = new Date().toLocaleDateString('ar-EG');
-      adm.all = data.filter(r => r.timestamp ? cairoDay(new Date(r.timestamp)) === today : r.dateStr === legacy);
-      $('admDate').textContent = dateFmt.format(new Date());
+      adm.raw = data;
+      admApplyDay();
+      admMemRender();
       renderAdmin();
     })
     .catch(() => {
@@ -1020,6 +1066,100 @@ function fetchAdminData(key, firstOpen) {
       $('attendanceTableBody').innerHTML = '<tr><td colspan="9" class="empty">' + L('حدث خطأ أثناء جلب البيانات.', 'An error occurred while loading data.') + '</td></tr>';
     });
 }
+
+// ===== بحث عن عضو بكل التواريخ (الاسم عربي أو إنجليزي) =====
+function admNorm(s) {
+  return String(s == null ? '' : s).toLowerCase()
+    .replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/[٠-٩]/g, d => d.charCodeAt(0) - 0x0660).replace(/[۰-۹]/g, d => d.charCodeAt(0) - 0x06F0)
+    .replace(/[^a-z0-9؀-ۿ\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// يجمع كل صيغ اسم العضو (حسب الرقم القومي) من كل التسجيلات: لو سجّل مرة بالعربي ومرة بالإنجليزي، البحث بأي واحد يطلعه
+function admMemIndex() {
+  const by = {};
+  adm.raw.forEach(r => {
+    const id = String(r.nationalId || '');
+    if (!id) return;
+    const m = by[id] || (by[id] = { id: id, names: [], norm: [], email: '', program: '', rows: [] });
+    const nm = String(r.name || '').replace(/\s+/g, ' ').trim();
+    if (nm && m.names.indexOf(nm) === -1) { m.names.push(nm); m.norm.push(admNorm(nm)); }
+    m.email = r.email || m.email; m.program = r.program || m.program;
+    m.rows.push(r);
+  });
+  Object.keys(by).forEach(id => {                       // البريد يعطي صيغة إنجليزية (rawanarafat555 ← rawanarafat)
+    const em = String(by[id].email || '').split('@')[0].toLowerCase().replace(/[^a-z]/g, '');
+    if (em.length > 3) by[id].norm.push(em);
+  });
+  return by;
+}
+function admMemMatch(m, q) {
+  const digits = q.replace(/\D/g, '');
+  if (digits.length >= 4 && digits.length === q.replace(/\s/g, '').length) return m.id.indexOf(digits) !== -1;
+  const toks = admNorm(q).split(' ').filter(Boolean);
+  return !!toks.length && m.norm.some(a => toks.every(t => a.indexOf(t) !== -1));
+}
+function admMemDays(m) {
+  const d = {};
+  m.rows.slice().reverse().forEach(r => {              // من الأقدم للأحدث
+    const day = admRowDay(r); if (!day) return;
+    const x = d[day] || (d[day] = { day: day, names: [], inT: '', hasIn: false, outT: '', hasOut: false, auto: false });
+    const nm = String(r.name || '').replace(/\s+/g, ' ').trim();
+    if (nm && x.names.indexOf(nm) === -1) x.names.push(nm);
+    const t = String(r.actionType || 'حضور');
+    if (t === 'حضور') { if (!x.hasIn) { x.inT = r.timeStr; x.hasIn = true; } }
+    else if (t.indexOf('انصراف') === 0) { if (t.indexOf('تلقائي') !== -1) x.auto = true; else { x.outT = r.timeStr; x.hasOut = true; } }
+  });
+  return d;
+}
+function admDayLabel(day) {
+  const p = day.split('-');
+  const wd = new Intl.DateTimeFormat(LANG === 'en' ? 'en-US' : 'ar-EG', { timeZone: 'UTC', weekday: 'long' }).format(new Date(day + 'T12:00:00Z'));
+  return { d: toAr(p[2] + '/' + p[1] + '/' + p[0]), w: wd };
+}
+function admMemRender() {
+  const box = $('memRes'); if (!box) return;
+  $('memTitle').textContent = L('🔎 بحث عن عضو بكل التواريخ', '🔎 Find a member across all dates');
+  $('memQ').placeholder = L('الاسم (عربي أو English) أو الرقم القومي', 'Name (Arabic or English) or national ID');
+  $('memDayLbl').textContent = L('في تاريخ', 'On date');
+  $('memClear').textContent = L('مسح', 'Clear');
+  $('memDay').max = cairoDay(new Date());
+  const q = $('memQ').value.trim(), day = $('memDay').value;
+  if (!q) { box.innerHTML = ''; return; }
+  if (!adm.raw.length) { box.innerHTML = '<div class="mm__none">' + L('جارٍ تحميل البيانات…', 'Loading data…') + '</div>'; return; }
+  const idx = admMemIndex();
+  const found = Object.keys(idx).map(k => idx[k]).filter(m => admMemMatch(m, q)).slice(0, 15);
+  if (!found.length) { box.innerHTML = '<div class="mm__none">' + L('لا يوجد عضو مطابق. جرّبي جزءًا آخر من الاسم أو الرقم القومي.', 'No matching member. Try another part of the name or the national ID.') + '</div>'; return; }
+  const none = '<span class="muted">' + L('لم يُسجَّل', 'Not recorded') + '</span>';
+  const cell = (has, t) => has ? '<span class="badge badge--in">' + esc(tm(t)) + '</span>' : none;
+  box.innerHTML = found.map(m => {
+    const days = admMemDays(m), keys = Object.keys(days).sort().reverse();
+    const attended = keys.filter(k => days[k].hasIn).length;
+    const head = '<div class="mm__h">' + m.names.map(esc).join(' <span class="muted">/</span> ') +
+      '<small>' + esc(progTxt(m.program)) + ' · ' + esc(adm.showNid ? m.id : maskNid(m.id)) + ' · ' + esc(m.email) + '</small>' +
+      '<small>' + L('أيام الحضور المسجّلة: ', 'Recorded attendance days: ') + toAr(attended) + '</small></div>';
+    let body;
+    if (day) {
+      const x = days[day], lb = admDayLabel(day);
+      const verdict = x && x.hasIn
+        ? '<div class="mm__v mm__v--yes">✅ ' + L('حضر يوم ', 'Attended on ') + esc(lb.w + ' ' + lb.d) + '</div>'
+        : '<div class="mm__v mm__v--no">❌ ' + L('لم يسجّل حضورًا يوم ', 'No check-in on ') + esc(lb.w + ' ' + lb.d) + (x && (x.hasOut || x.auto) ? L(' (يوجد انصراف فقط)', ' (check-out only)') : '') + '</div>';
+      body = verdict + (x ? '<div class="mm__wrap"><table><thead><tr><th>' + L('الاسم المسجّل', 'Registered name') + '</th><th>' + L('الحضور', 'Check-in') + '</th><th>' + L('الانصراف', 'Check-out') + '</th></tr></thead><tbody><tr><td>' +
+        x.names.map(esc).join(' / ') + '</td><td>' + cell(x.hasIn, x.inT) + '</td><td>' + (x.hasOut ? cell(true, x.outT) : x.auto ? '<span class="badge badge--out">' + L('تلقائي', 'Auto') + '</span>' : none) + '</td></tr></tbody></table></div>' : '');
+    } else if (!keys.length) {
+      body = '<div class="mm__none">' + L('لا توجد تسجيلات.', 'No records.') + '</div>';
+    } else {
+      body = '<div class="mm__wrap"><table><thead><tr><th>' + L('التاريخ', 'Date') + '</th><th>' + L('اليوم', 'Day') + '</th><th>' + L('الاسم المسجّل', 'Registered name') + '</th><th>' + L('الحضور', 'Check-in') + '</th><th>' + L('الانصراف', 'Check-out') + '</th></tr></thead><tbody>' +
+        keys.slice(0, 60).map(k => { const x = days[k], lb = admDayLabel(k);
+          return '<tr><td>' + esc(lb.d) + '</td><td>' + esc(lb.w) + '</td><td>' + x.names.map(esc).join(' / ') + '</td><td>' + cell(x.hasIn, x.inT) + '</td><td>' +
+            (x.hasOut ? cell(true, x.outT) : x.auto ? '<span class="badge badge--out">' + L('تلقائي', 'Auto') + '</span>' : none) + '</td></tr>'; }).join('') +
+        '</tbody></table></div>' + (keys.length > 60 ? '<div class="mm__none">' + L('تم عرض آخر ٦٠ يومًا. اختاري تاريخًا لتحديد يوم بعينه.', 'Showing the latest 60 days. Pick a date for a specific day.') + '</div>' : '');
+    }
+    return '<div class="mm">' + head + body + '</div>';
+  }).join('');
+}
+['memQ', 'memDay'].forEach(id => $(id).addEventListener('input', admMemRender));
+$('memDay').addEventListener('change', admMemRender);
+$('memClear').addEventListener('click', () => { $('memQ').value = ''; $('memDay').value = ''; admMemRender(); $('memQ').focus(); });
 
 // تجميع عمليات اليوم: صف واحد لكل عضو (حضوره وانصرافه في نفس الصف)
 function groupMembers(rows) {
@@ -1133,6 +1273,7 @@ $('hideAdminBtn').addEventListener('click', () => { try { localStorage.removeIte
 $('keyCancel').addEventListener('click', () => $('keyDialog').close());
 $('keyForm').addEventListener('submit', e => { e.preventDefault(); const k = $('keyInput').value.trim(); if (!k) return; $('keyDialog').close(); fetchAdminData(k, true); });
 $('refreshBtn').addEventListener('click', () => fetchAdminData());
+$('admDay').addEventListener('change', e => { adm.day = e.target.value || ''; admApplyDay(); renderAdmin(); });
 $('searchBox').addEventListener('input', e => { adm.query = e.target.value; renderAdmin(); });
 const syncNidText = () => { $('nidToggleText').textContent = adm.showNid ? L('إخفاء الأرقام القومية', 'Hide national IDs') : L('إظهار الأرقام القومية', 'Show national IDs'); };
 $('nidToggle').addEventListener('click', () => { adm.showNid = !adm.showNid; syncNidText(); renderAdmin(); });
@@ -1368,7 +1509,7 @@ function applyLang(persist) {
   if (pfErrRe && !$('pfErr').hidden) $('pfErr').textContent = pfErrRe();
   if (!$('pfGo').disabled) $('pfGoText').textContent = L('عرض ملفي', 'View my profile');
   if (pf.data) { renderInfo(pf.data); renderProfile(); }
-  if (adm.all.length || !$('adminView').hidden) { renderAdmin(); $('admDate').textContent = dateFmt.format(new Date()); }
+  if (adm.raw.length || !$('adminView').hidden) { admApplyDay(); renderAdmin(); admMemRender(); }
 }
 
 $('langBtn').addEventListener('click', () => { LANG = LANG === 'en' ? 'ar' : 'en'; applyLang(true); });
