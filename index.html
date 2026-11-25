@@ -529,6 +529,21 @@ body.show-admin #adminBtn{display:inline-flex}
   </div>
 </dialog>
 
+<dialog id="otpDialog" aria-labelledby="otpTitle">
+  <h2 class="dlg__title" id="otpTitle">التحقق من الجهاز</h2>
+  <p class="dlg__text" id="otpText">هذا الجهاز غير مربوط بحسابك. أرسلنا كودًا من ٦ أرقام إلى بريدك.</p>
+  <div class="field">
+    <label for="otpInput">كود التحقق</label>
+    <input class="input input--ltr" type="text" id="otpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+  </div>
+  <p class="err" id="otpErr" hidden></p>
+  <div class="dlg__actions">
+    <button type="button" class="btn btn--primary" id="otpOk">تأكيد</button>
+    <button type="button" class="btn btn--quiet" id="otpCancel">إلغاء</button>
+  </div>
+  <p class="dlg__text" style="margin:12px 0 0"><button type="button" class="btn btn--quiet" id="otpResend">إعادة إرسال الكود</button></p>
+</dialog>
+
 <dialog id="keyDialog" aria-labelledby="keyTitle">
   <form method="dialog" id="keyForm">
     <h2 class="dlg__title" id="keyTitle">دخول الإدارة</h2>
@@ -875,6 +890,7 @@ function friendlyError(data) {
     NO_CONSENT: L('يلزم الموافقة على إقرار استخدام الموقع الجغرافي أولًا.', 'You must first agree to the location-use statement.'),
     BAD_EMAIL: L('البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.', 'The email address is not valid. Please check it.'),
     DEVICE_TAKEN: L('تعذّر إتمام التسجيل من هذا الجهاز. يُرجى التسجيل من جهازك الشخصي، أو التواصل مع الإدارة.', 'Registration could not be completed from this device. Please register from your own device, or contact the administration.'),
+    DEVICE_LIMIT: L('تم تغيير الجهاز أكثر من المسموح خلال ٣٠ يومًا. يُرجى التواصل مع الإدارة.', 'The device was changed more than allowed in 30 days. Please contact the administration.'),
     BAD_NID: L('الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.', 'The national ID must be 14 digits. Please check it.'),
     MISSING_NAME: L('يُرجى إدخال الاسم.', 'Please enter your name.'),
     NOT_MEMBER: L('الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.', 'This national ID is not registered among the college members. Please contact the administration.'),
@@ -920,6 +936,56 @@ function applyProfile() {
   document.querySelectorAll('input[name="prog_chk"]').forEach(cb => cb.checked = (p.progs || []).indexOf(cb.value) !== -1);
 }
 function syncProfileUi() { $('profileNote').hidden = !loadProfile(); }
+
+
+// ===================== التحقق من الجهاز بكود على الإيميل =====================
+const OTP_MSG = {
+  OTP_BAD: 'الكود غير صحيح. تأكد منه وأعد المحاولة.', OTP_EXPIRED: 'انتهت صلاحية الكود. اضغط «إعادة إرسال الكود».',
+  OTP_LOCKED: 'محاولات خاطئة كثيرة. اطلب كودًا جديدًا.', OTP_WAIT: 'انتظر دقيقة قبل طلب كود جديد.',
+  MAIL_FAIL: 'تعذّر إرسال الكود. حاول بعد قليل أو تواصل مع الإدارة.', TOO_MANY: 'طلبات كثيرة. حاول بعد ساعة.',
+  DEVICE_LIMIT: 'تم تغيير الجهاز أكثر من المسموح خلال ٣٠ يومًا. تواصل مع الإدارة.', BAD_EMAIL: 'البريد الإلكتروني غير صحيح.',
+  NOT_MEMBER: 'الرقم القومي غير مسجّل.', MEMBER_INACTIVE: 'هذا الحساب موقوف.'
+};
+async function otpCall(action, extra) {
+  const fd = new URLSearchParams();
+  fd.append('action', action); fd.append('nationalId', $('nationalId').value.trim()); fd.append('email', $('memberEmail').value.trim());
+  fd.append('deviceId', getDeviceId()); fd.append('deviceHint', deviceHint());
+  Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
+  const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
+  return res.json();
+}
+function otpShowErr(msg) { const e = $('otpErr'); e.textContent = msg || ''; e.hidden = !msg; }
+async function otpSend() {
+  otpShowErr(''); $('otpResend').disabled = true;
+  try {
+    const d = await otpCall('sendOtp');
+    if (d.result === 'success') $('otpText').textContent = 'أرسلنا كودًا من ٦ أرقام إلى بريدك ' + (d.maskedEmail || '') + '. اكتبه هنا لربط هذا الجهاز بحسابك.';
+    else otpShowErr(OTP_MSG[d.code] || d.message || 'تعذّر إرسال الكود.');
+  } catch (e) { otpShowErr('تعذّر الاتصال بالخادم.'); }
+  setTimeout(() => { $('otpResend').disabled = false; }, 30000);
+}
+function openOtp() {
+  $('otpInput').value = ''; otpShowErr('');
+  const dlg = $('otpDialog'); if (!dlg.open) dlg.showModal();
+  otpSend();
+}
+async function otpConfirm() {
+  const code = $('otpInput').value.trim();
+  if (!/^[0-9\u0660-\u0669]{6}$/.test(code)) return otpShowErr('اكتب الكود المكوّن من ٦ أرقام.');
+  $('otpOk').disabled = true; otpShowErr('');
+  try {
+    const d = await otpCall('verifyOtp', { code: code });
+    if (d.result === 'success') { $('otpDialog').close(); submitForm({ preventDefault() {} }); }
+    else otpShowErr(OTP_MSG[d.code] || d.message || 'تعذّر التحقق.');
+  } catch (e) { otpShowErr('تعذّر الاتصال بالخادم.'); }
+  $('otpOk').disabled = false;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  $('otpOk').addEventListener('click', otpConfirm);
+  $('otpResend').addEventListener('click', otpSend);
+  $('otpCancel').addEventListener('click', () => $('otpDialog').close());
+  $('otpInput').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); otpConfirm(); } });
+});
 
 // ===================== إرسال التسجيل =====================
 async function submitForm(e) {
@@ -967,6 +1033,7 @@ async function submitForm(e) {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
     if (data.result === 'success') { saveProfile(name, nationalId, email, Array.from(document.querySelectorAll('input[name="prog_chk"]:checked')).map(cb => cb.value)); showReceipt(action, name, now, data.distance); }
+    else if (data.code === 'OTP_REQUIRED') { openOtp(); }
     else { showAlert(() => friendlyError(data)); $('errorAlert').scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   } catch (err) {
     showAlert(() => L('تعذّر الاتصال بالخادم. يُرجى التأكد من الإنترنت قبل إعادة المحاولة، وقد يكون التسجيل قد تم بالفعل — يمكن التأكد من الإدارة.', 'Could not reach the server. Please check your internet before retrying. The registration may already have gone through — you can confirm with the administration.'));
