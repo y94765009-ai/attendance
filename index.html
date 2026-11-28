@@ -529,6 +529,18 @@ body.show-admin #adminBtn{display:inline-flex}
   </div>
 </dialog>
 
+<dialog id="camDialog" aria-labelledby="camTitle">
+  <h2 class="dlg__title" id="camTitle">التقاط صورة للتحقق</h2>
+  <p class="dlg__text" id="camText">وجّه الكاميرا الأمامية إلى وجهك والتقط الصورة. تُحفظ الصورة للتحقق من الحضور فقط وتُحذف تلقائيًا بعد ٦٠ يومًا.</p>
+  <video id="camVideo" autoplay playsinline muted style="width:100%;border-radius:14px;background:#000;transform:scaleX(-1);max-height:55vh;object-fit:cover"></video>
+  <canvas id="camCanvas" hidden></canvas>
+  <p class="err" id="camErr" hidden></p>
+  <div class="dlg__actions">
+    <button type="button" class="btn btn--primary" id="camShot">التقاط الصورة</button>
+    <button type="button" class="btn btn--quiet" id="camCancel">إلغاء</button>
+  </div>
+</dialog>
+
 <dialog id="otpDialog" aria-labelledby="otpTitle">
   <h2 class="dlg__title" id="otpTitle">التحقق من الجهاز</h2>
   <p class="dlg__text" id="otpText">هذا الجهاز غير مربوط بحسابك. أرسلنا كودًا من ٦ أرقام إلى بريدك.</p>
@@ -575,7 +587,7 @@ const LOCATION_MAX_AGE_MS = 3 * 60 * 1000;
 // أوقات التسجيل بالدقائق من منتصف الليل (بتوقيت القاهرة) — للعرض فقط، والسيرفر هو الحكم
 const WINDOWS = {
   'حضور':   { start: 8 * 60 + 30,  end: 10 * 60 + 30, startAr: '٨:٣٠ صباحًا', startEn: '8:30 AM' },
-  'انصراف': { start: 15 * 60, end: 17 * 60, startAr: '٣:٠٠ مساءً', startEn: '3:00 PM' }
+  'انصراف': { start: 15 * 60 + 30, end: 17 * 60, startAr: '٣:٣٠ مساءً', startEn: '3:30 PM' }
 };
 
 // true = زر الإدارة ظاهر للجميع (الحماية بمفتاح الإدارة على السيرفر). false = مخفي ويظهر فقط بالرابط #admin أو على جهاز الأدمن
@@ -891,6 +903,7 @@ function friendlyError(data) {
     BAD_EMAIL: L('البريد الإلكتروني غير صحيح. يُرجى التأكد من كتابته.', 'The email address is not valid. Please check it.'),
     DEVICE_TAKEN: L('تعذّر إتمام التسجيل من هذا الجهاز. يُرجى التسجيل من جهازك الشخصي، أو التواصل مع الإدارة.', 'Registration could not be completed from this device. Please register from your own device, or contact the administration.'),
     DEVICE_LIMIT: L('تم تغيير الجهاز أكثر من المسموح خلال ٣٠ يومًا. يُرجى التواصل مع الإدارة.', 'The device was changed more than allowed in 30 days. Please contact the administration.'),
+    NO_PHOTO: L('يلزم التقاط صورة بالكاميرا لإتمام التسجيل. اسمح باستخدام الكاميرا ثم أعد المحاولة.', 'A live photo is required. Please allow camera access and try again.'),
     BAD_NID: L('الرقم القومي يجب أن يكون ١٤ رقمًا. يُرجى التأكد من كتابته.', 'The national ID must be 14 digits. Please check it.'),
     MISSING_NAME: L('يُرجى إدخال الاسم.', 'Please enter your name.'),
     NOT_MEMBER: L('الرقم القومي غير مسجّل ضمن أعضاء الكلية. يُرجى التواصل مع الإدارة.', 'This national ID is not registered among the college members. Please contact the administration.'),
@@ -937,6 +950,83 @@ function applyProfile() {
 }
 function syncProfileUi() { $('profileNote').hidden = !loadProfile(); }
 
+
+
+// ===================== صورة لايف بالكاميرا =====================
+const PHOTO_REQUIRED = false;
+let photoData = '', photoTime = 0, camStream = null, camResolve = null;
+function camStop() { if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } $('camVideo').srcObject = null; }
+function camClose(val) { camStop(); const d = $('camDialog'); if (d.open) d.close(); const r = camResolve; camResolve = null; if (r) r(val); }
+function camErr(msg) { const e = $('camErr'); e.textContent = msg || ''; e.hidden = !msg; }
+function ensurePhoto() {
+  if (photoData && Date.now() - photoTime < 180000) return Promise.resolve(photoData);
+  return new Promise(async resolve => {
+    camResolve = resolve; camErr(''); camReset();
+    $('camDialog').showModal();
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      $('camVideo').srcObject = camStream;
+    } catch (e) {
+      camErr('تعذّر تشغيل الكاميرا. اسمح باستخدام الكاميرا من إعدادات المتصفح ثم أعد المحاولة، ويجب فتح الرابط من متصفح الموبايل مباشرة.');
+    }
+  });
+}
+const LIVE_CHALLENGES = ['ابتسم ابتسامة واضحة', 'التفت لليمين قليلًا', 'التفت لليسار قليلًا', 'أغلق عينيك لحظة', 'ارفع حاجبيك'];
+const LIVE_MIN_MOTION = 2;   // أقل فرق (من 255) بين اللقطتين، لو أقل يُعتبر ثابتًا
+let camStep = 0, camFrameA = null, camChallenge = '', camTimer = null;
+function camGrab() {
+  const v = $('camVideo'), w = 320, h = Math.round(v.videoHeight * w / v.videoWidth) || 240;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(v, 0, 0, w, h);
+  return c;
+}
+function camMotion(a, b) {
+  const s = c => { const t = document.createElement('canvas'); t.width = 32; t.height = 24; const x = t.getContext('2d'); x.drawImage(c, 0, 0, 32, 24); return x.getImageData(0, 0, 32, 24).data; };
+  const da = s(a), db = s(b); let sum = 0;
+  for (let i = 0; i < da.length; i += 4) sum += Math.abs(da[i] - db[i]) + Math.abs(da[i + 1] - db[i + 1]) + Math.abs(da[i + 2] - db[i + 2]);
+  return sum / (da.length / 4 * 3);
+}
+function camReset() {
+  clearInterval(camTimer); camStep = 0; camFrameA = null;
+  $('camShot').disabled = false; $('camShot').textContent = 'التقاط الصورة الأولى';
+  $('camText').textContent = 'ثبّت وجهك أمام الكاميرا الأمامية ثم التقط الصورة الأولى. بعدها سنطلب منك حركة بسيطة. تُحفظ الصورة للتحقق من الحضور فقط وتُحذف تلقائيًا بعد ٦٠ يومًا.';
+}
+function camCompose(a, b) {
+  const bar = 34, c = document.createElement('canvas'); c.width = a.width * 2; c.height = a.height + bar;
+  const x = c.getContext('2d');
+  x.fillStyle = '#112143'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(a, 0, 0); x.drawImage(b, a.width, 0);
+  x.fillStyle = '#fff'; x.font = '15px sans-serif'; x.textBaseline = 'middle'; x.direction = 'rtl'; x.textAlign = 'right';
+  x.fillText(camChallenge, c.width - 10, a.height + bar / 2);
+  x.direction = 'ltr'; x.textAlign = 'left';
+  x.fillText(new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' }), 10, a.height + bar / 2);
+  return c.toDataURL('image/jpeg', 0.6).replace(/^data:image\/jpeg;base64,/, '');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  $('camCancel').addEventListener('click', () => { camReset(); camClose(''); });
+  $('camDialog').addEventListener('close', () => { camReset(); camStop(); if (camResolve) { const r = camResolve; camResolve = null; r(''); } });
+  $('camShot').addEventListener('click', () => {
+    const v = $('camVideo');
+    if (!v.videoWidth) return camErr('الكاميرا لم تعمل بعد. انتظر لحظة ثم أعد المحاولة.');
+    camErr('');
+    if (camStep === 0) {
+      camFrameA = camGrab(); camStep = 1;
+      camChallenge = LIVE_CHALLENGES[Math.floor(Math.random() * LIVE_CHALLENGES.length)];
+      $('camText').textContent = 'الآن: ' + camChallenge + '. سيتم التقاط الصورة الثانية تلقائيًا.';
+      let n = 3; $('camShot').disabled = true; $('camShot').textContent = 'تبدأ بعد ' + n + '…';
+      camTimer = setInterval(() => {
+        n--;
+        if (n > 0) { $('camShot').textContent = 'تبدأ بعد ' + n + '…'; return; }
+        clearInterval(camTimer);
+        const fb = camGrab();
+        if (camMotion(camFrameA, fb) < LIVE_MIN_MOTION) { camReset(); return camErr('لم نلاحظ أي حركة بين الصورتين. أعد المحاولة وقم بالحركة المطلوبة.'); }
+        photoData = camCompose(camFrameA, fb); photoTime = Date.now();
+        camReset(); camClose(photoData);
+      }, 1000);
+    }
+  });
+});
 
 // ===================== التحقق من الجهاز بكود على الإيميل =====================
 const OTP_MSG = {
@@ -1012,6 +1102,7 @@ async function submitForm(e) {
   }
 
   const programs = Array.from(document.querySelectorAll('input[name="prog_chk"]:checked')).map(cb => cb.value).join(' ، ');
+  if (PHOTO_REQUIRED && !(await ensurePhoto())) { showAlert(() => L('يلزم التقاط صورة بالكاميرا لإتمام التسجيل.', 'A live photo is required to complete registration.')); return; }
   const now = new Date(), action = currentActionType;
   submitting = true;
   setSubmitEnabled(false);
@@ -1022,6 +1113,7 @@ async function submitForm(e) {
   fd.append('name', name); fd.append('nationalId', nationalId); fd.append('email', email);
   fd.append('program', programs); fd.append('actionType', action); fd.append('consent', 'true');
   fd.append('deviceId', getDeviceId()); fd.append('deviceHint', deviceHint());
+  if (PHOTO_REQUIRED) fd.append('photo', photoData);
   fd.append('dateStr', now.toLocaleDateString('ar-EG'));
   fd.append('timeStr', now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }));
   fd.append('location', $('locationField').value);
@@ -1032,6 +1124,7 @@ async function submitForm(e) {
   try {
     const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd });
     const data = await res.json();
+    if (data.code !== 'OTP_REQUIRED') { photoData = ''; photoTime = 0; }
     if (data.result === 'success') { saveProfile(name, nationalId, email, Array.from(document.querySelectorAll('input[name="prog_chk"]:checked')).map(cb => cb.value)); showReceipt(action, name, now, data.distance); }
     else if (data.code === 'OTP_REQUIRED') { openOtp(); }
     else { showAlert(() => friendlyError(data)); $('errorAlert').scrollIntoView({ block: 'center', behavior: 'smooth' }); }
